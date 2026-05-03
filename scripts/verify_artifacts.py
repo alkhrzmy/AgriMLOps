@@ -1,27 +1,33 @@
+import argparse
 from pathlib import Path
 
-REQUIRED_ARTIFACTS = [
-    Path("models/model_v1.pt"),
-    Path("models/label_map.json"),
-    Path("models/model_v1_metadata.json"),
-    Path("reports/metrics_v1.json"),
-    Path("reports/confusion_matrix_v1.png"),
-    Path("reports/classification_report_v1.csv"),
-]
+
+def required_artifacts(version: str) -> list[Path]:
+    return [
+        Path(f"models/model_{version}.pt"),
+        Path("models/label_map.json"),
+        Path(f"models/model_{version}_metadata.json"),
+        Path(f"reports/metrics_{version}.json"),
+    ]
 
 
 def main() -> int:
-    missing = [path for path in REQUIRED_ARTIFACTS if not path.exists()]
+    parser = argparse.ArgumentParser(description="Verify required AgriMLOps model artifacts.")
+    parser.add_argument("--version", default="v1", choices=["v1", "v2"])
+    args = parser.parse_args()
+
+    required_files = required_artifacts(args.version)
+    missing = [path for path in required_files if not path.exists()]
 
     if missing:
-        print("Artifact verification failed. Missing required files:")
+        print(f"Artifact verification failed for {args.version}. Missing required files:")
         for path in missing:
             print(f"- {path}")
         print("\nTrain on Kaggle, download agrimlops_artifacts.zip, extract it to the repo root, then run this script again.")
         return 1
 
-    print("Artifact verification passed. Required Kaggle artifacts are present:")
-    for path in REQUIRED_ARTIFACTS:
+    print(f"Artifact verification passed for {args.version}. Required Kaggle artifacts are present:")
+    for path in required_files:
         size_mb = path.stat().st_size / (1024 * 1024)
         print(f"- {path} ({size_mb:.2f} MB)")
     return 0

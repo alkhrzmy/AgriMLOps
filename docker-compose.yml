@@ -6,10 +6,9 @@ services:
     ports:
       - "8000:8000"
     environment:
+      - CURRENT_MODEL_VERSION=${CURRENT_MODEL_VERSION:-v1}
       - DATABASE_URL=sqlite:///data/agrimlops.db
-      - MODEL_PATH=models/model_v1.pt
       - LABEL_MAP_PATH=models/label_map.json
-      - MODEL_METADATA_PATH=models/model_v1_metadata.json
       - UPLOAD_DIR=data/feedback/uploads
     volumes:
       - ./data:/app/data
@@ -23,8 +22,8 @@ services:
     ports:
       - "8501:8501"
     environment:
+      - CURRENT_MODEL_VERSION=${CURRENT_MODEL_VERSION:-v1}
       - API_BASE_URL=http://api:8000
-      - MODEL_METADATA_PATH=models/model_v1_metadata.json
     volumes:
       - ./data:/app/data
       - ./models:/app/models

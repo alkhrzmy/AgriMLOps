@@ -10,9 +10,10 @@ import torch
 from PIL import Image
 from torchvision import transforms
 
-MODEL_PATH = Path(os.getenv("MODEL_PATH", "models/model_v1.pt"))
+CURRENT_MODEL_VERSION = os.getenv("CURRENT_MODEL_VERSION", "v1")
+MODEL_PATH = Path(os.getenv("MODEL_PATH", f"models/model_{CURRENT_MODEL_VERSION}.pt"))
 LABEL_MAP_PATH = Path(os.getenv("LABEL_MAP_PATH", "models/label_map.json"))
-METADATA_PATH = Path(os.getenv("MODEL_METADATA_PATH", "models/model_v1_metadata.json"))
+METADATA_PATH = Path(os.getenv("MODEL_METADATA_PATH", f"models/model_{CURRENT_MODEL_VERSION}_metadata.json"))
 DEFAULT_MODEL_NAME = "tf_efficientnetv2_b0"
 DEFAULT_INPUT_SIZE = 224
 LOW_CONFIDENCE_THRESHOLD = 0.70
@@ -23,7 +24,7 @@ class ModelArtifactNotFoundError(FileNotFoundError):
 
 
 def _missing_artifact_message(path: Path) -> str:
-    return f"Model artifact not found: {path}. Please train on Kaggle and place model_v1.pt in models/."
+    return f"Model artifact not found: {path}. Please train on Kaggle and place the model artifact in models/."
 
 
 def _load_json(path: Path) -> dict:
@@ -98,7 +99,8 @@ def get_model_status() -> dict:
             metadata = json.load(file)
     return {
         "model_loaded": artifacts_exist,
-        "model_version": metadata.get("model_version"),
+        "current_model_version": CURRENT_MODEL_VERSION,
+        "model_version": metadata.get("model_version", CURRENT_MODEL_VERSION),
         "model_name": metadata.get("model_name"),
         "model_path": str(MODEL_PATH),
         "metadata_path": str(METADATA_PATH),

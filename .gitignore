@@ -9,6 +9,7 @@ data/raw/
 data/processed/images/
 data/cache/
 data/feedback/uploads/
+data/retraining/
 
 # database runtime
 *.db

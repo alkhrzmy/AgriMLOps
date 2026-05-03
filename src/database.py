@@ -9,7 +9,8 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 
 DATABASE_PATH = Path("data/agrimlops.db")
 DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DATABASE_PATH.as_posix()}")
-MODEL_METADATA_PATH = Path(os.getenv("MODEL_METADATA_PATH", "models/model_v1_metadata.json"))
+CURRENT_MODEL_VERSION = os.getenv("CURRENT_MODEL_VERSION", "v1")
+MODEL_METADATA_PATH = Path(os.getenv("MODEL_METADATA_PATH", f"models/model_{CURRENT_MODEL_VERSION}_metadata.json"))
 
 if DATABASE_URL.startswith("sqlite:///"):
     db_path = Path(DATABASE_URL.replace("sqlite:///", "", 1))
@@ -345,7 +346,7 @@ def register_current_model_from_metadata() -> dict | None:
             id=_new_id(),
             model_version=model_version,
             model_name=metadata.get("model_name", "unknown"),
-            artifact_path=os.getenv("MODEL_PATH", "models/model_v1.pt"),
+            artifact_path=os.getenv("MODEL_PATH", f"models/model_{CURRENT_MODEL_VERSION}.pt"),
             accuracy=metadata.get("accuracy"),
             macro_f1=metadata.get("macro_f1"),
             status="deployed",

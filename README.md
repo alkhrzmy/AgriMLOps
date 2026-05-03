@@ -182,6 +182,19 @@ Akses aplikasi:
 - Streamlit: `http://localhost:8501`
 - FastAPI docs: `http://localhost:8000/docs`
 
+Current production model dipilih melalui environment variable:
+
+```bash
+CURRENT_MODEL_VERSION=v1
+```
+
+Jika model v2 sudah diverifikasi dan dipromosikan:
+
+```bash
+python scripts/promote_model.py --version v2
+docker compose up -d --build
+```
+
 ## Endpoint API
 
 ```text
@@ -205,7 +218,25 @@ POST /active-learning/{item_id}/validate
 7. User mengirim feedback benar/salah/tidak yakin melalui `POST /feedback`.
 8. Feedback salah/tidak yakin masuk active learning queue.
 9. Admin memvalidasi item queue di halaman Active Learning Queue.
-10. Data tervalidasi dapat dipakai untuk retraining versi berikutnya.
+10. Data tervalidasi dapat dipakai untuk retraining versi berikutnya di Kaggle GPU.
+
+## Retraining Semi-Manual
+
+Retraining tidak dijalankan lokal. Export feedback tervalidasi:
+
+```bash
+python scripts/export_validated_feedback.py
+```
+
+Setelah artifact v2 dari Kaggle diextract ke repo:
+
+```bash
+python scripts/verify_artifacts.py --version v2
+python scripts/compare_models.py
+python scripts/promote_model.py --version v2
+```
+
+Detail lengkap ada di `docs/retraining_workflow.md`.
 
 ## Roadmap Implementasi Bertahap
 

@@ -61,6 +61,7 @@ def health_check() -> dict:
         "service": "agrimlops-plantwild-api",
         "model_loaded": model_status["model_loaded"],
         "model_artifact_available": model_status["model_loaded"],
+        "current_model_version": model_status["current_model_version"],
         "model_version": model_status["model_version"],
         "database_available": database_available(),
     }

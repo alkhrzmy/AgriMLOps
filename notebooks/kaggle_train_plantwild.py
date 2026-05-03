@@ -28,9 +28,16 @@ from tqdm.auto import tqdm
 
 SEED = 42
 REPO_ID = "uqtwei2/PlantWild"
+MODEL_VERSION = "v2"
+USE_VALIDATED_FEEDBACK = True
+FEEDBACK_ZIP_PATH = "/kaggle/input/agrimlops-feedback/validated_feedback.zip"
+EXISTING_LABEL_MAP_PATH = "/kaggle/input/agrimlops-v1/label_map.json"
+BASE_MODEL_PATH = "/kaggle/input/agrimlops-v1/model_v1.pt"
 DATA_DIR = Path("/kaggle/working/plantwild")
 EXTRACT_DIR = Path("/kaggle/working/plantwild_extracted")
-ARTIFACT_DIR = Path("/kaggle/working/agrimlops_artifacts")
+FEEDBACK_EXTRACT_DIR = Path("/kaggle/working/validated_feedback")
+ARTIFACT_BASENAME = f"/kaggle/working/agrimlops_artifacts_{MODEL_VERSION}" if MODEL_VERSION != "v1" else "/kaggle/working/agrimlops_artifacts"
+ARTIFACT_DIR = Path(ARTIFACT_BASENAME)
 MODEL_DIR = ARTIFACT_DIR / "models"
 REPORT_DIR = ARTIFACT_DIR / "reports"
 MODEL_NAME = "tf_efficientnetv2_b0"
@@ -55,6 +62,7 @@ print(f"Using device: {DEVICE}")
 MODEL_DIR.mkdir(parents=True, exist_ok=True)
 REPORT_DIR.mkdir(parents=True, exist_ok=True)
 EXTRACT_DIR.mkdir(parents=True, exist_ok=True)
+FEEDBACK_EXTRACT_DIR.mkdir(parents=True, exist_ok=True)
 
 snapshot_download(
     repo_id=REPO_ID,
@@ -98,6 +106,57 @@ def extract_archive(archive_path, extract_dir):
     else:
         print(f"Skipped unsupported archive: {archive_path}")
     return target_dir
+
+
+def load_existing_label_map(label_map_path):
+    label_map_path = Path(label_map_path)
+    if not label_map_path.exists():
+        return None, None
+    with label_map_path.open("r", encoding="utf-8") as file:
+        label_map = json.load(file)
+    if "label_to_id" in label_map:
+        label_to_id = {str(label): int(idx) for label, idx in label_map["label_to_id"].items()}
+    elif "id_to_label" in label_map:
+        label_to_id = {str(label): int(idx) for idx, label in label_map["id_to_label"].items()}
+    else:
+        label_to_id = {str(label): int(idx) for idx, label in label_map.items()}
+    id_to_label = {str(idx): label for label, idx in label_to_id.items()}
+    return label_to_id, id_to_label
+
+
+def load_validated_feedback(feedback_zip_path, label_to_id):
+    feedback_zip_path = Path(feedback_zip_path)
+    if not USE_VALIDATED_FEEDBACK or not feedback_zip_path.exists():
+        print("No validated feedback ZIP found or feedback usage disabled.")
+        return pd.DataFrame(columns=["image_path", "label", "label_id", "source"])
+
+    feedback_root = extract_archive(feedback_zip_path, FEEDBACK_EXTRACT_DIR)
+    metadata_candidates = list(feedback_root.rglob("metadata.csv"))
+    if not metadata_candidates:
+        print(f"No metadata.csv found in validated feedback ZIP: {feedback_zip_path}")
+        return pd.DataFrame(columns=["image_path", "label", "label_id", "source"])
+
+    metadata_path = metadata_candidates[0]
+    feedback_df = pd.read_csv(metadata_path)
+    rows = []
+    for row in feedback_df.to_dict("records"):
+        label = row.get("validated_label")
+        if label not in label_to_id:
+            continue
+        image_path = Path(row.get("image_path", ""))
+        if not image_path.is_absolute():
+            image_path = metadata_path.parent / image_path
+        if image_path.exists():
+            rows.append(
+                {
+                    "image_path": str(image_path),
+                    "label": label,
+                    "label_id": label_to_id[label],
+                    "source": "validated_feedback",
+                }
+            )
+    print(f"Loaded {len(rows)} validated feedback samples for training.")
+    return pd.DataFrame(rows, columns=["image_path", "label", "label_id", "source"])
 
 
 print_tree(DATA_DIR)
@@ -149,10 +208,15 @@ if raw_index.empty:
         "For PlantWild v2, try ARCHIVE_FILENAMES = ['plantwild_v2.zip']."
     )
 
+existing_label_to_id, existing_id_to_label = load_existing_label_map(EXISTING_LABEL_MAP_PATH)
 class_counts = raw_index["label_candidate"].value_counts()
-eligible_classes = class_counts[class_counts >= MIN_IMAGES_PER_CLASS].head(TOP_K_CLASSES).index.tolist()
-if len(eligible_classes) < 2:
-    eligible_classes = class_counts.head(TOP_K_CLASSES).index.tolist()
+if existing_label_to_id:
+    eligible_classes = list(existing_label_to_id.keys())
+    print(f"Using existing label_map with {len(eligible_classes)} classes from {EXISTING_LABEL_MAP_PATH}")
+else:
+    eligible_classes = class_counts[class_counts >= MIN_IMAGES_PER_CLASS].head(TOP_K_CLASSES).index.tolist()
+    if len(eligible_classes) < 2:
+        eligible_classes = class_counts.head(TOP_K_CLASSES).index.tolist()
 
 subset = raw_index[raw_index["label_candidate"].isin(eligible_classes)].copy()
 subset = subset.rename(columns={"label_candidate": "label"})
@@ -167,9 +231,14 @@ for row in tqdm(subset.to_dict("records"), desc="Validating images"):
         pass
 
 subset = pd.DataFrame(valid_rows)
-labels = sorted(subset["label"].unique().tolist())
-label_to_id = {label: idx for idx, label in enumerate(labels)}
-id_to_label = {str(idx): label for label, idx in label_to_id.items()}
+if existing_label_to_id:
+    label_to_id = existing_label_to_id
+    id_to_label = existing_id_to_label
+    labels = [id_to_label[str(idx)] for idx in sorted(int(key) for key in id_to_label.keys())]
+else:
+    labels = sorted(subset["label"].unique().tolist())
+    label_to_id = {label: idx for idx, label in enumerate(labels)}
+    id_to_label = {str(idx): label for label, idx in label_to_id.items()}
 subset["label_id"] = subset["label"].map(label_to_id)
 
 train_df, temp_df = train_test_split(
@@ -188,6 +257,11 @@ val_df, test_df = train_test_split(
 train_df = train_df.copy()
 val_df = val_df.copy()
 test_df = test_df.copy()
+feedback_train_df = load_validated_feedback(FEEDBACK_ZIP_PATH, label_to_id)
+feedback_samples_used = len(feedback_train_df)
+if feedback_samples_used:
+    feedback_train_df = feedback_train_df[["image_path", "label", "label_id"]].copy()
+    train_df = pd.concat([train_df, feedback_train_df], ignore_index=True)
 train_df["split"] = "train"
 val_df["split"] = "val"
 test_df["split"] = "test"
@@ -197,6 +271,18 @@ dataset_df.to_csv(REPORT_DIR / "dataset.csv", index=False)
 
 class_distribution = dataset_df.groupby(["split", "label"]).size().reset_index(name="count")
 class_distribution.to_csv(REPORT_DIR / "class_distribution.csv", index=False)
+dataset_summary = {
+    "model_version": MODEL_VERSION,
+    "plantwild_samples": int(len(subset)),
+    "feedback_samples_used": int(feedback_samples_used),
+    "train_samples": int(len(train_df)),
+    "val_samples": int(len(val_df)),
+    "test_samples": int(len(test_df)),
+    "num_classes": int(len(labels)),
+    "classes": labels,
+}
+with open(REPORT_DIR / f"retraining_dataset_summary_{MODEL_VERSION}.json", "w", encoding="utf-8") as file:
+    json.dump(dataset_summary, file, indent=2)
 
 plt.figure(figsize=(12, 8))
 sns.countplot(data=dataset_df, y="label", hue="split", order=labels)
@@ -267,6 +353,14 @@ test_loader = DataLoader(
 )
 
 model = timm.create_model(MODEL_NAME, pretrained=True, num_classes=len(labels))
+base_model_path = Path(BASE_MODEL_PATH)
+base_model_version = None
+if base_model_path.exists():
+    model.load_state_dict(torch.load(base_model_path, map_location=DEVICE))
+    base_model_version = "v1"
+    print(f"Loaded base model weights from {base_model_path}")
+else:
+    print("Base model weights not found. Starting from ImageNet pretrained weights.")
 model = model.to(DEVICE)
 criterion = nn.CrossEntropyLoss()
 optimizer = torch.optim.AdamW(model.parameters(), lr=LR, weight_decay=1e-4)
@@ -335,10 +429,10 @@ for epoch in range(1, EPOCHS + 1):
 
     if val_metrics["macro_f1"] > best_val_f1:
         best_val_f1 = val_metrics["macro_f1"]
-        torch.save(model.state_dict(), MODEL_DIR / "model_v1.pt")
+        torch.save(model.state_dict(), MODEL_DIR / f"model_{MODEL_VERSION}.pt")
         print(f"Saved best model with val_macro_f1={best_val_f1:.4f}")
 
-model.load_state_dict(torch.load(MODEL_DIR / "model_v1.pt", map_location=DEVICE))
+model.load_state_dict(torch.load(MODEL_DIR / f"model_{MODEL_VERSION}.pt", map_location=DEVICE))
 test_metrics = evaluate_model(test_loader)
 
 metrics = {
@@ -349,20 +443,20 @@ metrics = {
     "best_val_macro_f1": float(best_val_f1),
     "history": history,
 }
-with open(REPORT_DIR / "metrics_v1.json", "w", encoding="utf-8") as file:
+with open(REPORT_DIR / f"metrics_{MODEL_VERSION}.json", "w", encoding="utf-8") as file:
     json.dump(metrics, file, indent=2)
 
 report_df = pd.DataFrame(classification_report(test_metrics["y_true"], test_metrics["y_pred"], target_names=labels, output_dict=True, zero_division=0)).transpose()
-report_df.to_csv(REPORT_DIR / "classification_report_v1.csv")
+report_df.to_csv(REPORT_DIR / f"classification_report_{MODEL_VERSION}.csv")
 
 cm = confusion_matrix(test_metrics["y_true"], test_metrics["y_pred"], labels=list(range(len(labels))))
 plt.figure(figsize=(12, 10))
 sns.heatmap(cm, cmap="Blues", xticklabels=labels, yticklabels=labels, cbar=True)
 plt.xlabel("Predicted")
 plt.ylabel("True")
-plt.title("Confusion Matrix - EfficientNetV2-B0 PlantWild")
+plt.title(f"Confusion Matrix - EfficientNetV2-B0 PlantWild {MODEL_VERSION}")
 plt.tight_layout()
-plt.savefig(REPORT_DIR / "confusion_matrix_v1.png", dpi=160)
+plt.savefig(REPORT_DIR / f"confusion_matrix_{MODEL_VERSION}.png", dpi=160)
 plt.close()
 
 sample_df = test_df.sample(n=min(9, len(test_df)), random_state=SEED).reset_index(drop=True)
@@ -388,19 +482,21 @@ plt.savefig(REPORT_DIR / "sample_predictions.png", dpi=160)
 plt.close()
 
 metadata = {
-    "model_version": "v1",
+    "model_version": MODEL_VERSION,
     "model_name": MODEL_NAME,
-    "dataset": "uqtwei2/PlantWild subset",
+    "base_model_version": base_model_version,
+    "dataset": "uqtwei2/PlantWild subset + validated feedback" if feedback_samples_used else "uqtwei2/PlantWild subset",
     "num_classes": len(labels),
     "input_size": INPUT_SIZE,
     "accuracy": test_metrics["accuracy"],
     "macro_f1": test_metrics["macro_f1"],
+    "feedback_samples_used": int(feedback_samples_used),
     "created_at": datetime.now(timezone.utc).isoformat(),
-    "notes": "trained on Kaggle GPU",
+    "notes": "retrained on Kaggle GPU using validated active learning feedback" if MODEL_VERSION != "v1" else "trained on Kaggle GPU",
 }
-with open(MODEL_DIR / "model_v1_metadata.json", "w", encoding="utf-8") as file:
+with open(MODEL_DIR / f"model_{MODEL_VERSION}_metadata.json", "w", encoding="utf-8") as file:
     json.dump(metadata, file, indent=2)
 
-shutil.make_archive("/kaggle/working/agrimlops_artifacts", "zip", str(ARTIFACT_DIR))
-print("Created /kaggle/working/agrimlops_artifacts.zip")
+zip_path = shutil.make_archive(ARTIFACT_BASENAME, "zip", str(ARTIFACT_DIR))
+print(f"Created {zip_path}")
 print(json.dumps(metadata, indent=2))
