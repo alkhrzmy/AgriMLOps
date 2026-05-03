@@ -1,0 +1,33 @@
+__pycache__/
+*.pyc
+.env
+.venv/
+venv/
+
+# data besar jangan dipush
+data/raw/
+data/processed/images/
+data/cache/
+
+# database runtime
+*.db
+*.sqlite
+
+# logs runtime
+logs/
+
+# model experiments besar
+models/checkpoints/
+models/*.ckpt
+models/*.onnx
+models/*.tflite
+
+# izinkan artifact model final jika <100MB
+!models/model_v1.pt
+!models/label_map.json
+!models/model_v1_metadata.json
+
+# reports penting boleh dipush
+!reports/metrics_v1.json
+!reports/confusion_matrix_v1.png
+!reports/classification_report_v1.csv
