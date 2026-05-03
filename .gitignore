@@ -8,6 +8,7 @@ venv/
 data/raw/
 data/processed/images/
 data/cache/
+data/feedback/uploads/
 
 # database runtime
 *.db

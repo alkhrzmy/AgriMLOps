@@ -120,10 +120,24 @@ reports/classification_report_v1.csv
 
 Jika `models/model_v1.pt` lebih dari 100MB, jangan commit ke GitHub. Gunakan GitHub Release, Hugging Face, atau object storage, lalu simpan URL sebagai `MODEL_URL`.
 
+## Current Model Performance
+
+Model production saat ini berasal dari training Kaggle GPU pada subset 15 kelas PlantWild:
+
+```text
+model_version: v1
+model_name: tf_efficientnetv2_b0
+accuracy: 0.8217
+macro_f1: 0.8086
+input_size: 224
+artifact: models/model_v1.pt
+```
+
 ## Menjalankan API Lokal
 
 ```bash
 pip install -r requirements.txt
+python scripts/verify_artifacts.py
 uvicorn app.api.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
@@ -150,17 +164,48 @@ Contoh response setelah artifact tersedia:
 streamlit run app/web/streamlit_app.py
 ```
 
+Smoke test API:
+
+```bash
+python scripts/smoke_test_api.py
+```
+
 ## Menjalankan dengan Docker Compose
 
 ```bash
 python scripts/verify_artifacts.py
-docker compose up -d --build
+docker compose up --build
 ```
 
 Akses aplikasi:
 
 - Streamlit: `http://localhost:8501`
 - FastAPI docs: `http://localhost:8000/docs`
+
+## Endpoint API
+
+```text
+GET  /health
+GET  /model/current
+POST /predict
+POST /feedback
+GET  /monitoring/summary
+GET  /active-learning/queue
+POST /active-learning/{item_id}/validate
+```
+
+## Alur MLOps Produk
+
+1. User upload foto tanaman melalui Streamlit.
+2. Streamlit memanggil `POST /predict`.
+3. FastAPI menyimpan upload ke `data/feedback/uploads/YYYYMMDD/`.
+4. `src.predict` melakukan inference dengan artifact `models/model_v1.pt`.
+5. Prediksi disimpan ke SQLite `data/agrimlops.db`.
+6. Prediksi low-confidence masuk `active_learning_queue`.
+7. User mengirim feedback benar/salah/tidak yakin melalui `POST /feedback`.
+8. Feedback salah/tidak yakin masuk active learning queue.
+9. Admin memvalidasi item queue di halaman Active Learning Queue.
+10. Data tervalidasi dapat dipakai untuk retraining versi berikutnya.
 
 ## Roadmap Implementasi Bertahap
 
