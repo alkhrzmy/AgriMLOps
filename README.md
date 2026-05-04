@@ -139,15 +139,17 @@ Jika `models/model_v1.pt` lebih dari 100MB, jangan commit ke GitHub. Gunakan Git
 
 ## Current Model Performance
 
-Model production saat ini berasal dari training Kaggle GPU kedua pada subset 15 kelas PlantWild:
+Model production saat ini berasal dari training Kaggle GPU ketiga (v3) dengan 9 validated feedback samples pada subset 15 kelas PlantWild:
 
 ```text
-model_version: v2
+model_version: v3
 model_name: tf_efficientnetv2_b0
-accuracy: 0.8253
-macro_f1: 0.8124
+accuracy: 0.8288
+macro_f1: 0.8127
 input_size: 224
-artifact: models/model_v2.pt
+base_model: v2
+feedback_samples_used: 9
+artifact: models/model_v3.pt
 ```
 
 ## Menjalankan API Lokal
