@@ -6,7 +6,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - CURRENT_MODEL_VERSION=${CURRENT_MODEL_VERSION:-v1}
+      - CURRENT_MODEL_VERSION=${CURRENT_MODEL_VERSION:-v2}
       - DATABASE_URL=sqlite:///data/agrimlops.db
       - LABEL_MAP_PATH=models/label_map.json
       - UPLOAD_DIR=data/feedback/uploads
