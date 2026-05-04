@@ -10,9 +10,17 @@ Gambar 3.3 Struktur API endpoints FastAPI ......................................
 Gambar 3.4 Struktur halaman Streamlit UI .......................................................................... 32
 Gambar 3.5 Arsitektur deployment Docker Compose ............................................................ 33
 Gambar 3.6 Workflow training model di Kaggle ............................................................ 38
+Gambar 3.7 Workflow controlled validated feedback simulation ........................................... 39
 Gambar 4.1 Perbandingan performa model v1, v2, v3 ....................................................... 44
 Gambar 4.2 Training curves model v3 (loss dan accuracy) ................................................. 45
-Gambar 4.3 Tampilan Active Learning Queue di Streamlit UI ............................................... 49
-Gambar 4.4 Tampilan Model Registry di Streamlit UI ......................................................... 50
-Gambar 4.5 Tampilan Monitoring Dashboard di Streamlit UI ................................................. 51
-Gambar 4.6 Status deployment pada DigitalOcean Droplet ................................................... 53
+Gambar 4.3 Confusion matrix model v3 ......................................................................... 46
+Gambar 4.4 Sample prediction model ............................................................................ 47
+Gambar 4.5 Diagnosis page pada Streamlit UI ................................................................. 49
+Gambar 4.6 Prediction result pada Streamlit UI ............................................................... 50
+Gambar 4.7 Feedback form pada Streamlit UI ................................................................... 51
+Gambar 4.8 Active Learning Queue pada Streamlit UI ......................................................... 52
+Gambar 4.9 Monitoring Dashboard pada Streamlit UI .......................................................... 53
+Gambar 4.10 Model Registry pada Streamlit UI .................................................................. 54
+Gambar 4.11 FastAPI documentation ............................................................................. 55
+Gambar 4.12 FastAPI health endpoint ............................................................................ 56
+
