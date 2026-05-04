@@ -152,20 +152,22 @@ def main() -> int:
             elif predicted_label != ground_truth:
                 post_feedback(api_base_url, prediction_id, "incorrect", ground_truth, CONTROLLED_INCORRECT_COMMENT)
                 queue_items = get_pending_queue(api_base_url)
-                matching_item = next((item for item in queue_items if item.get("prediction_id") == prediction_id), None)
-                if matching_item:
-                    validate_queue_item(api_base_url, matching_item["id"], ground_truth)
-                    report["incorrect_validated"] += 1
+                matching_items = [item for item in queue_items if item.get("prediction_id") == prediction_id]
+                if matching_items:
+                    for item in matching_items:
+                        validate_queue_item(api_base_url, item["id"], ground_truth)
+                    report["incorrect_validated"] += len(matching_items)
                 else:
                     report["failed_requests"] += 1
                     print(f"Pending queue item not found for prediction_id={prediction_id}")
             else:
                 post_feedback(api_base_url, prediction_id, "unsure", ground_truth, CONTROLLED_LOW_CONFIDENCE_COMMENT)
                 queue_items = get_pending_queue(api_base_url)
-                matching_item = next((item for item in queue_items if item.get("prediction_id") == prediction_id), None)
-                if matching_item:
-                    validate_queue_item(api_base_url, matching_item["id"], ground_truth)
-                    report["low_confidence_validated"] += 1
+                matching_items = [item for item in queue_items if item.get("prediction_id") == prediction_id]
+                if matching_items:
+                    for item in matching_items:
+                        validate_queue_item(api_base_url, item["id"], ground_truth)
+                    report["low_confidence_validated"] += len(matching_items)
                 else:
                     report["failed_requests"] += 1
                     print(f"Pending queue item not found for prediction_id={prediction_id}")
