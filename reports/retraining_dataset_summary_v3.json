@@ -1,0 +1,26 @@
+{
+  "model_version": "v3",
+  "plantwild_samples": 5646,
+  "feedback_samples_used": 9,
+  "train_samples": 3961,
+  "val_samples": 847,
+  "test_samples": 847,
+  "num_classes": 15,
+  "classes": [
+    "apple leaf",
+    "apple rust",
+    "apple scab",
+    "basil leaf",
+    "cabbage leaf",
+    "cherry leaf",
+    "citrus canker",
+    "corn smut",
+    "cucumber leaf",
+    "grape downy mildew",
+    "maple leaf",
+    "plum leaf",
+    "squash leaf",
+    "tomato early blight",
+    "tomato late blight"
+  ]
+}

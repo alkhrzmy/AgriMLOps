@@ -13,7 +13,7 @@ def required_artifacts(version: str) -> list[Path]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Verify required AgriMLOps model artifacts.")
-    parser.add_argument("--version", default="v1", choices=["v1", "v2"])
+    parser.add_argument("--version", default="v1", choices=["v1", "v2", "v3"])
     args = parser.parse_args()
 
     required_files = required_artifacts(args.version)
