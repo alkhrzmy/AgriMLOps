@@ -58,7 +58,9 @@ DROPLET_FEEDBACK_PATH = "/root/AgriMLOps/data/retraining/validated_feedback_2026
 DROPLET_V2_PATH = "/root/AgriMLOps/models"
 
 # Kaggle input paths (will be used on Kaggle)
-KAGGLE_FEEDBACK_PATH = "/kaggle/input/agrimlops-validated-feedback-v3/validated_feedback_20260504_025418.zip"
+# Note: Actual path may include username prefix like /kaggle/input/datasets/username/dataset-name
+# The notebook will auto-detect the correct path
+KAGGLE_FEEDBACK_PATH = "/kaggle/input/agrimlops-validated-feedback-v3"
 KAGGLE_LABEL_MAP_PATH = "/kaggle/input/agrimlops-v2-artifacts/label_map.json"
 KAGGLE_BASE_MODEL_PATH = "/kaggle/input/agrimlops-v2-artifacts/model_v2.pt"
 
@@ -159,23 +161,52 @@ if not IS_KAGGLE:
 
 # Validate Kaggle input files exist
 if IS_KAGGLE:
-    if USE_VALIDATED_FEEDBACK and not Path(FEEDBACK_ZIP_PATH).exists():
-        print(f"ERROR: Validated feedback ZIP not found at {FEEDBACK_ZIP_PATH}")
-        print("Please add the 'agrimlops-validated-feedback-v3' dataset as input to this notebook.")
-        print("Expected path: /kaggle/input/agrimlops-validated-feedback-v3/validated_feedback_20260504_025418.zip")
-        raise FileNotFoundError(f"Feedback ZIP not found: {FEEDBACK_ZIP_PATH}")
+    # Auto-detect feedback path (handle username prefix)
+    feedback_path = Path(FEEDBACK_ZIP_PATH)
+    if USE_VALIDATED_FEEDBACK and not feedback_path.exists():
+        # Try finding in /kaggle/input/datasets/username/
+        kaggle_input = Path("/kaggle/input")
+        for dataset_dir in kaggle_input.rglob("*"):
+            if "agrimlops-validated-feedback-v3" in str(dataset_dir).lower():
+                if dataset_dir.is_dir():
+                    FEEDBACK_ZIP_PATH = str(dataset_dir)
+                    print(f"Auto-detected feedback path: {FEEDBACK_ZIP_PATH}")
+                    break
+                elif dataset_dir.suffix == ".zip":
+                    FEEDBACK_ZIP_PATH = str(dataset_dir)
+                    print(f"Auto-detected feedback ZIP: {FEEDBACK_ZIP_PATH}")
+                    break
+        
+        if not Path(FEEDBACK_ZIP_PATH).exists():
+            print(f"ERROR: Validated feedback not found")
+            print(f"Tried: {KAGGLE_FEEDBACK_PATH}")
+            print("Please add the 'agrimlops-validated-feedback-v3' dataset as input to this notebook.")
+            raise FileNotFoundError(f"Feedback not found")
     
+    # Auto-detect v2 artifacts path
     if not Path(EXISTING_LABEL_MAP_PATH).exists():
-        print(f"ERROR: Label map not found at {EXISTING_LABEL_MAP_PATH}")
-        print("Please add the 'agrimlops-v2-artifacts' dataset as input to this notebook.")
-        print("Expected path: /kaggle/input/agrimlops-v2-artifacts/label_map.json")
-        raise FileNotFoundError(f"Label map not found: {EXISTING_LABEL_MAP_PATH}")
+        kaggle_input = Path("/kaggle/input")
+        for dataset_dir in kaggle_input.rglob("label_map.json"):
+            EXISTING_LABEL_MAP_PATH = str(dataset_dir)
+            print(f"Auto-detected label_map path: {EXISTING_LABEL_MAP_PATH}")
+            break
     
     if not Path(BASE_MODEL_PATH).exists():
-        print(f"ERROR: Base model not found at {BASE_MODEL_PATH}")
+        kaggle_input = Path("/kaggle/input")
+        for dataset_dir in kaggle_input.rglob("model_v2.pt"):
+            BASE_MODEL_PATH = str(dataset_dir)
+            print(f"Auto-detected base model path: {BASE_MODEL_PATH}")
+            break
+    
+    if not Path(EXISTING_LABEL_MAP_PATH).exists():
+        print(f"ERROR: Label map not found")
         print("Please add the 'agrimlops-v2-artifacts' dataset as input to this notebook.")
-        print("Expected path: /kaggle/input/agrimlops-v2-artifacts/model_v2.pt")
-        raise FileNotFoundError(f"Base model not found: {BASE_MODEL_PATH}")
+        raise FileNotFoundError(f"Label map not found")
+    
+    if not Path(BASE_MODEL_PATH).exists():
+        print(f"ERROR: Base model not found")
+        print("Please add the 'agrimlops-v2-artifacts' dataset as input to this notebook.")
+        raise FileNotFoundError(f"Base model not found")
     
     print("✓ All Kaggle input files found")
 
@@ -240,18 +271,28 @@ def load_existing_label_map(label_map_path):
 
 
 def load_validated_feedback(feedback_zip_path, label_to_id):
-    feedback_zip_path = Path(feedback_zip_path)
-    if not USE_VALIDATED_FEEDBACK or not feedback_zip_path.exists():
-        print("No validated feedback ZIP found or feedback usage disabled.")
+    feedback_path = Path(feedback_zip_path)
+    if not USE_VALIDATED_FEEDBACK or not feedback_path.exists():
+        print("No validated feedback found or feedback usage disabled.")
         return pd.DataFrame(columns=["image_path", "label", "label_id", "source"])
 
-    feedback_root = extract_archive(feedback_zip_path, FEEDBACK_EXTRACT_DIR)
-    metadata_candidates = list(feedback_root.rglob("metadata.csv"))
-    if not metadata_candidates:
-        print(f"No metadata.csv found in validated feedback ZIP: {feedback_zip_path}")
-        return pd.DataFrame(columns=["image_path", "label", "label_id", "source"])
+    # Handle folder input (directly from Kaggle dataset)
+    if feedback_path.is_dir():
+        feedback_root = feedback_path
+        metadata_candidates = list(feedback_root.rglob("metadata.csv"))
+        if not metadata_candidates:
+            print(f"No metadata.csv found in feedback folder: {feedback_path}")
+            return pd.DataFrame(columns=["image_path", "label", "label_id", "source"])
+        metadata_path = metadata_candidates[0]
+    # Handle ZIP input
+    else:
+        feedback_root = extract_archive(feedback_path, FEEDBACK_EXTRACT_DIR)
+        metadata_candidates = list(feedback_root.rglob("metadata.csv"))
+        if not metadata_candidates:
+            print(f"No metadata.csv found in validated feedback ZIP: {feedback_path}")
+            return pd.DataFrame(columns=["image_path", "label", "label_id", "source"])
+        metadata_path = metadata_candidates[0]
 
-    metadata_path = metadata_candidates[0]
     feedback_df = pd.read_csv(metadata_path)
     rows = []
     for row in feedback_df.to_dict("records"):
