@@ -83,7 +83,7 @@ def model_registry() -> dict:
     model_status = get_model_status()
     current_version = model_status["current_model_version"]
     items = []
-    for version in ["v1", "v2"]:
+    for version in ["v1", "v2", "v3"]:
         metadata_path = MODEL_DIR / f"model_{version}_metadata.json"
         artifact_path = MODEL_DIR / f"model_{version}.pt"
         if not metadata_path.exists():
@@ -198,6 +198,25 @@ def feedback(payload: FeedbackRequest) -> dict:
             confidence=prediction["confidence"],
             reason=reason,
         )
+        # Also auto-validate any existing pending low_confidence item for same prediction
+        if payload.suggested_label:
+            from src.database import SessionLocal, ActiveLearningQueue
+            with SessionLocal() as session:
+                existing_items = (
+                    session.query(ActiveLearningQueue)
+                    .filter(
+                        ActiveLearningQueue.prediction_id == payload.prediction_id,
+                        ActiveLearningQueue.status == "pending",
+                    )
+                    .all()
+                )
+                for item in existing_items:
+                    if item.id != queue_item["id"]:
+                        item.status = "validated"
+                        item.validated_label = payload.suggested_label
+                        item.validator_note = "auto-validated from feedback suggested_label"
+                        item.validated_at = datetime.utcnow()
+                session.commit()
 
     return {"status": "ok", "feedback": feedback_row, "active_learning_item": queue_item}
 
