@@ -10,24 +10,26 @@ import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-# Install dependencies individually with error handling
-def install_package(package):
-    try:
-        subprocess.check_call([sys.executable, "-m", "pip", "-q", package])
-        return True
-    except subprocess.CalledProcessError:
-        return False
-
-packages = ["timm", "huggingface_hub", "scikit-learn", "seaborn"]
-for pkg in packages:
-    if not install_package(pkg):
-        print(f"Warning: Failed to install {pkg}")
-
-# Only install paramiko for local use (SSH download)
+# Install dependencies individually with error handling (skip on Kaggle)
 IS_KAGGLE = Path("/kaggle/input").exists()
+
 if not IS_KAGGLE:
+    def install_package(package):
+        try:
+            subprocess.check_call([sys.executable, "-m", "pip", "-q", package])
+            return True
+        except subprocess.CalledProcessError:
+            return False
+
+    packages = ["timm", "huggingface_hub", "scikit-learn", "seaborn"]
+    for pkg in packages:
+        if not install_package(pkg):
+            print(f"Warning: Failed to install {pkg}")
+
     if not install_package("paramiko"):
         print("Warning: Failed to install paramiko. SSH download will not work.")
+else:
+    print("Running on Kaggle - assuming packages are pre-installed or installed via !pip install")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -154,6 +156,28 @@ if not IS_KAGGLE:
         EXISTING_LABEL_MAP_PATH = download_from_ssh(DROPLET_HOST, DROPLET_USER, f"{DROPLET_V2_PATH}/label_map.json", EXISTING_LABEL_MAP_PATH)
     if not Path(BASE_MODEL_PATH).exists():
         BASE_MODEL_PATH = download_from_ssh(DROPLET_HOST, DROPLET_USER, f"{DROPLET_V2_PATH}/model_v2.pt", BASE_MODEL_PATH)
+
+# Validate Kaggle input files exist
+if IS_KAGGLE:
+    if USE_VALIDATED_FEEDBACK and not Path(FEEDBACK_ZIP_PATH).exists():
+        print(f"ERROR: Validated feedback ZIP not found at {FEEDBACK_ZIP_PATH}")
+        print("Please add the 'agrimlops-validated-feedback-v3' dataset as input to this notebook.")
+        print("Expected path: /kaggle/input/agrimlops-validated-feedback-v3/validated_feedback_20260504_025418.zip")
+        raise FileNotFoundError(f"Feedback ZIP not found: {FEEDBACK_ZIP_PATH}")
+    
+    if not Path(EXISTING_LABEL_MAP_PATH).exists():
+        print(f"ERROR: Label map not found at {EXISTING_LABEL_MAP_PATH}")
+        print("Please add the 'agrimlops-v2-artifacts' dataset as input to this notebook.")
+        print("Expected path: /kaggle/input/agrimlops-v2-artifacts/label_map.json")
+        raise FileNotFoundError(f"Label map not found: {EXISTING_LABEL_MAP_PATH}")
+    
+    if not Path(BASE_MODEL_PATH).exists():
+        print(f"ERROR: Base model not found at {BASE_MODEL_PATH}")
+        print("Please add the 'agrimlops-v2-artifacts' dataset as input to this notebook.")
+        print("Expected path: /kaggle/input/agrimlops-v2-artifacts/model_v2.pt")
+        raise FileNotFoundError(f"Base model not found: {BASE_MODEL_PATH}")
+    
+    print("✓ All Kaggle input files found")
 
 snapshot_download(
     repo_id=REPO_ID,
