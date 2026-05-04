@@ -7,7 +7,7 @@
 
 ## Workspace Structure
 
-- `00_format/`: template format. Catatan: `FORMAT.docx` tidak ditemukan saat setup sehingga folder ini belum berisi template.
+- `00_format/`: template format `FORMAT.docx`.
 - `01_current_draft/`: draft DOCX awal.
 - `02_references_pdf/`: seluruh PDF paper referensi.
 - `03_reference_notes/`: literature matrix dan catatan referensi.
@@ -84,6 +84,6 @@ Tabel yang dibuat dan/atau dimasukkan:
 
 ## Script Pendukung
 
-- `scripts/generate_paper_assets.py`: generate diagram dan tabel.
-- `scripts/capture_paper_screenshots.py`: capture screenshot production via Playwright/Chrome.
-- `report/convert_to_docx_v2.py`: convert markdown laporan ke DOCX final dengan gambar dan tabel.
+- `scripts/generate_paper_like_assets.py`: regenerate diagram paper-like, panel screenshot evidence, dan analisis visual referensi tanpa menyalin gambar paper.
+- `paper_workspace/08_report_markdown/convert_to_docx_v2.py`: convert markdown laporan ke DOCX final dengan gambar, caption, source note, dan tabel rapi.
+- `paper_workspace/03_reference_notes/visual_reference_analysis.md`: catatan referensi visual dari paper yang digunakan sebagai inspirasi, bukan copy langsung.
