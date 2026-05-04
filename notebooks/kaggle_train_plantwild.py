@@ -10,9 +10,24 @@ import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-subprocess.check_call([sys.executable, "-m", "pip", "-q", "timm", "huggingface_hub", "scikit-learn", "seaborn", "paramiko"])
+# Install dependencies individually with error handling
+def install_package(package):
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "-q", package])
+        return True
+    except subprocess.CalledProcessError:
+        return False
 
-import paramiko
+packages = ["timm", "huggingface_hub", "scikit-learn", "seaborn"]
+for pkg in packages:
+    if not install_package(pkg):
+        print(f"Warning: Failed to install {pkg}")
+
+# Only install paramiko for local use (SSH download)
+IS_KAGGLE = Path("/kaggle/input").exists()
+if not IS_KAGGLE:
+    if not install_package("paramiko"):
+        print("Warning: Failed to install paramiko. SSH download will not work.")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -105,6 +120,8 @@ FEEDBACK_EXTRACT_DIR.mkdir(parents=True, exist_ok=True)
 
 def download_from_ssh(host, user, remote_path, local_path):
     """Download file from remote server via SSH with password prompt."""
+    import paramiko
+    
     local_path = Path(local_path)
     if local_path.exists():
         print(f"Using existing local file: {local_path}")
