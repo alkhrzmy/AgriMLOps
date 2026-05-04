@@ -1,3 +1,4 @@
+import getpass
 import json
 import math
 import random
@@ -9,8 +10,9 @@ import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "timm", "huggingface_hub", "scikit-learn", "seaborn"])
+subprocess.check_call([sys.executable, "-m", "pip", "-q", "timm", "huggingface_hub", "scikit-learn", "seaborn", "paramiko"])
 
+import paramiko
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -26,17 +28,49 @@ from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
 from tqdm.auto import tqdm
 
+# ==================== CONFIGURATION ====================
 SEED = 42
 REPO_ID = "uqtwei2/PlantWild"
 MODEL_VERSION = "v3"
 USE_VALIDATED_FEEDBACK = True
-FEEDBACK_ZIP_PATH = "/kaggle/input/agrimlops-feedback/validated_feedback.zip"
-EXISTING_LABEL_MAP_PATH = "/kaggle/input/agrimlops-v2/label_map.json"
-BASE_MODEL_PATH = "/kaggle/input/agrimlops-v2/model_v2.pt"
-DATA_DIR = Path("/kaggle/working/plantwild")
-EXTRACT_DIR = Path("/kaggle/working/plantwild_extracted")
-FEEDBACK_EXTRACT_DIR = Path("/kaggle/working/validated_feedback")
-ARTIFACT_BASENAME = f"/kaggle/working/agrimlops_artifacts_{MODEL_VERSION}" if MODEL_VERSION != "v1" else "/kaggle/working/agrimlops_artifacts"
+
+# Droplet SSH configuration (for local use)
+DROPLET_HOST = "159.65.139.148"
+DROPLET_USER = "root"
+DROPLET_FEEDBACK_PATH = "/root/AgriMLOps/data/retraining/validated_feedback_20260504_025418.zip"
+DROPLET_V2_PATH = "/root/AgriMLOps/models"
+
+# Kaggle input paths (will be used on Kaggle)
+KAGGLE_FEEDBACK_PATH = "/kaggle/input/agrimlops-validated-feedback-v3/validated_feedback_20260504_025418.zip"
+KAGGLE_LABEL_MAP_PATH = "/kaggle/input/agrimlops-v2-artifacts/label_map.json"
+KAGGLE_BASE_MODEL_PATH = "/kaggle/input/agrimlops-v2-artifacts/model_v2.pt"
+
+# Local paths (will be used if not on Kaggle)
+LOCAL_FEEDBACK_ZIP_PATH = Path("data/retraining/validated_feedback_20260504_025418.zip")
+LOCAL_LABEL_MAP_PATH = Path("models/label_map.json")
+LOCAL_BASE_MODEL_PATH = Path("models/model_v2.pt")
+
+# Auto-detect environment
+IS_KAGGLE = Path("/kaggle/input").exists()
+
+# Set paths based on environment
+if IS_KAGGLE:
+    FEEDBACK_ZIP_PATH = KAGGLE_FEEDBACK_PATH
+    EXISTING_LABEL_MAP_PATH = KAGGLE_LABEL_MAP_PATH
+    BASE_MODEL_PATH = KAGGLE_BASE_MODEL_PATH
+    DATA_DIR = Path("/kaggle/working/plantwild")
+    EXTRACT_DIR = Path("/kaggle/working/plantwild_extracted")
+    FEEDBACK_EXTRACT_DIR = Path("/kaggle/working/validated_feedback")
+    ARTIFACT_BASENAME = f"/kaggle/working/agrimlops_artifacts_{MODEL_VERSION}" if MODEL_VERSION != "v1" else "/kaggle/working/agrimlops_artifacts"
+else:
+    FEEDBACK_ZIP_PATH = str(LOCAL_FEEDBACK_ZIP_PATH)
+    EXISTING_LABEL_MAP_PATH = str(LOCAL_LABEL_MAP_PATH)
+    BASE_MODEL_PATH = str(LOCAL_BASE_MODEL_PATH)
+    DATA_DIR = Path("data/plantwild")
+    EXTRACT_DIR = Path("data/plantwild_extracted")
+    FEEDBACK_EXTRACT_DIR = Path("data/validated_feedback")
+    ARTIFACT_BASENAME = f"data/agrimlops_artifacts_{MODEL_VERSION}" if MODEL_VERSION != "v1" else "data/agrimlops_artifacts"
+
 ARTIFACT_DIR = Path(ARTIFACT_BASENAME)
 MODEL_DIR = ARTIFACT_DIR / "models"
 REPORT_DIR = ARTIFACT_DIR / "reports"
@@ -45,10 +79,14 @@ ARCHIVE_FILENAMES = ["plantwild.zip"]
 HF_ALLOW_PATTERNS = ARCHIVE_FILENAMES + ["README.md", ".gitattributes"]
 TOP_K_CLASSES = 15
 INPUT_SIZE = 224
-EPOCHS = 8
+EPOCHS = 12  # More epochs for v3
 BATCH_SIZE = 32
 LR = 3e-4
 MIN_IMAGES_PER_CLASS = 10
+
+print(f"Environment: {'Kaggle' if IS_KAGGLE else 'Local'}")
+print(f"Model version: {MODEL_VERSION}")
+print(f"Use validated feedback: {USE_VALIDATED_FEEDBACK}")
 
 random.seed(SEED)
 np.random.seed(SEED)
@@ -63,6 +101,42 @@ MODEL_DIR.mkdir(parents=True, exist_ok=True)
 REPORT_DIR.mkdir(parents=True, exist_ok=True)
 EXTRACT_DIR.mkdir(parents=True, exist_ok=True)
 FEEDBACK_EXTRACT_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def download_from_ssh(host, user, remote_path, local_path):
+    """Download file from remote server via SSH with password prompt."""
+    local_path = Path(local_path)
+    if local_path.exists():
+        print(f"Using existing local file: {local_path}")
+        return local_path
+    
+    print(f"Downloading {remote_path} from {user}@{host}...")
+    password = getpass.getpass(f"Enter SSH password for {user}@{host}: ")
+    
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    client.connect(host, username=user, password=password)
+    
+    sftp = client.open_sftp()
+    local_path.parent.mkdir(parents=True, exist_ok=True)
+    sftp.get(remote_path, str(local_path))
+    sftp.close()
+    client.close()
+    
+    print(f"Downloaded to: {local_path}")
+    return local_path
+
+
+# Download validated feedback from Droplet if not on Kaggle and file doesn't exist
+if USE_VALIDATED_FEEDBACK and not IS_KAGGLE and not Path(FEEDBACK_ZIP_PATH).exists():
+    FEEDBACK_ZIP_PATH = download_from_ssh(DROPLET_HOST, DROPLET_USER, DROPLET_FEEDBACK_PATH, FEEDBACK_ZIP_PATH)
+
+# Download v2 artifacts from Droplet if not on Kaggle and files don't exist
+if not IS_KAGGLE:
+    if not Path(EXISTING_LABEL_MAP_PATH).exists():
+        EXISTING_LABEL_MAP_PATH = download_from_ssh(DROPLET_HOST, DROPLET_USER, f"{DROPLET_V2_PATH}/label_map.json", EXISTING_LABEL_MAP_PATH)
+    if not Path(BASE_MODEL_PATH).exists():
+        BASE_MODEL_PATH = download_from_ssh(DROPLET_HOST, DROPLET_USER, f"{DROPLET_V2_PATH}/model_v2.pt", BASE_MODEL_PATH)
 
 snapshot_download(
     repo_id=REPO_ID,
