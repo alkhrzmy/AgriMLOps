@@ -1,0 +1,12 @@
+{
+  "total_images_seen": 75,
+  "total_processed": 75,
+  "skipped_label_not_in_label_map": 0,
+  "correct_high_confidence": 72,
+  "incorrect_validated": 0,
+  "low_confidence_validated": 3,
+  "failed_requests": 0,
+  "api_base_url": "http://159.65.139.148:8000",
+  "timestamp": "2026-05-04T02:32:07.091765+00:00",
+  "dry_run": false
+}
