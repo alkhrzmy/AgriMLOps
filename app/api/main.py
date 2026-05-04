@@ -31,6 +31,7 @@ app = FastAPI(
 )
 
 UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "data/feedback/uploads"))
+MODEL_DIR = Path(os.getenv("MODEL_DIR", "models"))
 LOW_CONFIDENCE_THRESHOLD = 0.70
 
 
@@ -75,6 +76,48 @@ def current_model() -> dict:
         with METADATA_PATH.open("r", encoding="utf-8") as file:
             metadata = json.load(file)
     return {**model_status, **metadata}
+
+
+@app.get("/model/registry")
+def model_registry() -> dict:
+    model_status = get_model_status()
+    current_version = model_status["current_model_version"]
+    items = []
+    for version in ["v1", "v2"]:
+        metadata_path = MODEL_DIR / f"model_{version}_metadata.json"
+        artifact_path = MODEL_DIR / f"model_{version}.pt"
+        if not metadata_path.exists():
+            continue
+        with metadata_path.open("r", encoding="utf-8") as file:
+            metadata = json.load(file)
+        items.append(
+            {
+                "version": version,
+                "status": "deployed" if version == current_version else "candidate",
+                "artifact_path": str(artifact_path),
+                "metadata_path": str(metadata_path),
+                "artifact_available": artifact_path.exists(),
+                "model_name": metadata.get("model_name"),
+                "accuracy": metadata.get("accuracy"),
+                "macro_f1": metadata.get("macro_f1"),
+                "epochs": metadata.get("epochs"),
+                "batch_size": metadata.get("batch_size"),
+                "learning_rate": metadata.get("learning_rate"),
+                "optimizer": metadata.get("optimizer"),
+                "scheduler": metadata.get("scheduler"),
+                "input_size": metadata.get("input_size"),
+                "num_classes": metadata.get("num_classes"),
+                "train_samples": metadata.get("train_samples"),
+                "val_samples": metadata.get("val_samples"),
+                "test_samples": metadata.get("test_samples"),
+                "feedback_samples_used": metadata.get("feedback_samples_used"),
+                "training_platform": metadata.get("training_platform"),
+                "training_device": metadata.get("training_device"),
+                "created_at": metadata.get("created_at"),
+                "notes": metadata.get("notes"),
+            }
+        )
+    return {"current_model_version": current_version, "items": items}
 
 
 @app.post("/predict")

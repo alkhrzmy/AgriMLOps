@@ -1,3 +1,7 @@
+# Local development compatibility file.
+# Docker API uses requirements-api.txt.
+# Docker Web uses requirements-web.txt.
+# Kaggle training uses requirements-train.txt.
 fastapi
 uvicorn
 streamlit

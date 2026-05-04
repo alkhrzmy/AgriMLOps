@@ -20,15 +20,32 @@ Alur utama platform:
 
 ## Stack
 
-- Backend inference API: FastAPI
-- Frontend prototype: Streamlit
-- Database lokal: SQLite
-- Training model: PyTorch dan timm di Kaggle GPU
-- Model utama: EfficientNetV2-B0 pretrained ImageNet
-- Model pembanding opsional: MobileNetV3-Small
-- Dataset: PlantWild dari Hugging Face `uqtwei2/PlantWild`
-- Tracking sederhana: `metrics.json`, `label_map.json`, folder `models/`, dan folder `reports/`
-- Deployment target: Docker Compose di DigitalOcean Droplet
+- **Backend**: FastAPI untuk inference API dan MLOps endpoints
+- **Frontend**: Streamlit untuk UI diagnosis, monitoring, feedback, dan active learning
+- **Database**: SQLite untuk prediction logs, feedback, model registry, dan active learning queue
+- **ML Training**: PyTorch + timm di Kaggle GPU
+- **Deployment**: Docker Compose di DigitalOcean Droplet untuk serving/inference saja
+
+## Deployment Architecture
+
+- **Kaggle GPU**: training dan retraining EfficientNetV2.
+- **GitHub**: source code dan model artifact final jika ukuran masih layak untuk repository.
+- **DigitalOcean Droplet**: inference API, Streamlit UI, SQLite DB, upload image storage, monitoring, active learning queue.
+- **Droplet** tidak menjalankan training dan tidak membutuhkan dependency training seperti `scikit-learn`, `matplotlib`, `seaborn`, atau `huggingface_hub`.
+
+## Dependency Files
+
+- `requirements-api.txt`: dependency minimal FastAPI inference API.
+- `requirements-web.txt`: dependency minimal Streamlit UI.
+- `requirements-train.txt`: dependency training Kaggle.
+- `requirements.txt`: compatibility untuk local development.
+
+## Why Training Is Not Done on the Droplet
+
+- Training EfficientNetV2 membutuhkan GPU dan dependency berat.
+- Droplet MVP dipakai untuk serving/inference agar hemat biaya.
+- Retraining semi-manual dilakukan di Kaggle GPU dari validated feedback export.
+- Ini sesuai praktik MLOps karena training pipeline dan serving infrastructure boleh dipisah.
 
 ## Struktur Project
 
@@ -200,6 +217,7 @@ docker compose up -d --build
 ```text
 GET  /health
 GET  /model/current
+GET  /model/registry
 POST /predict
 POST /feedback
 GET  /monitoring/summary

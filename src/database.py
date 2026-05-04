@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-from sqlalchemy import Boolean, Column, DateTime, Float, String, Text, create_engine, func
+from sqlalchemy import Boolean, Column, DateTime, Float, Integer, String, Text, create_engine, func, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 DATABASE_PATH = Path("data/agrimlops.db")
@@ -71,6 +71,22 @@ class ModelRegistry(Base):
     artifact_path = Column(String, nullable=False)
     accuracy = Column(Float, nullable=True)
     macro_f1 = Column(Float, nullable=True)
+    dataset_name = Column(String, nullable=True)
+    dataset_version = Column(String, nullable=True)
+    num_classes = Column(Integer, nullable=True)
+    input_size = Column(Integer, nullable=True)
+    epochs = Column(Integer, nullable=True)
+    batch_size = Column(Integer, nullable=True)
+    learning_rate = Column(Float, nullable=True)
+    optimizer = Column(String, nullable=True)
+    scheduler = Column(String, nullable=True)
+    train_samples = Column(Integer, nullable=True)
+    val_samples = Column(Integer, nullable=True)
+    test_samples = Column(Integer, nullable=True)
+    feedback_samples_used = Column(Integer, nullable=True)
+    training_platform = Column(String, nullable=True)
+    training_device = Column(String, nullable=True)
+    notes = Column(Text, nullable=True)
     status = Column(String, nullable=False, default="deployed")
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
@@ -83,6 +99,37 @@ def get_database_path() -> Path:
 
 def init_db() -> None:
     Base.metadata.create_all(bind=engine)
+    ensure_model_registry_columns()
+
+
+def ensure_model_registry_columns() -> None:
+    if not DATABASE_URL.startswith("sqlite"):
+        return
+
+    required_columns = {
+        "dataset_name": "VARCHAR",
+        "dataset_version": "VARCHAR",
+        "num_classes": "INTEGER",
+        "input_size": "INTEGER",
+        "epochs": "INTEGER",
+        "batch_size": "INTEGER",
+        "learning_rate": "FLOAT",
+        "optimizer": "VARCHAR",
+        "scheduler": "VARCHAR",
+        "train_samples": "INTEGER",
+        "val_samples": "INTEGER",
+        "test_samples": "INTEGER",
+        "feedback_samples_used": "INTEGER",
+        "training_platform": "VARCHAR",
+        "training_device": "VARCHAR",
+        "notes": "TEXT",
+    }
+
+    with engine.begin() as connection:
+        existing_columns = {row[1] for row in connection.execute(text("PRAGMA table_info(model_registry)"))}
+        for column_name, column_type in required_columns.items():
+            if column_name not in existing_columns:
+                connection.execute(text(f"ALTER TABLE model_registry ADD COLUMN {column_name} {column_type}"))
 
 
 def database_available() -> bool:
@@ -130,6 +177,35 @@ def _queue_to_dict(row: ActiveLearningQueue) -> dict:
         "validator_note": row.validator_note,
         "created_at": _serialize_datetime(row.created_at),
         "validated_at": _serialize_datetime(row.validated_at),
+    }
+
+
+def _model_registry_to_dict(row: ModelRegistry) -> dict:
+    return {
+        "id": row.id,
+        "model_version": row.model_version,
+        "model_name": row.model_name,
+        "artifact_path": row.artifact_path,
+        "accuracy": row.accuracy,
+        "macro_f1": row.macro_f1,
+        "dataset_name": row.dataset_name,
+        "dataset_version": row.dataset_version,
+        "num_classes": row.num_classes,
+        "input_size": row.input_size,
+        "epochs": row.epochs,
+        "batch_size": row.batch_size,
+        "learning_rate": row.learning_rate,
+        "optimizer": row.optimizer,
+        "scheduler": row.scheduler,
+        "train_samples": row.train_samples,
+        "val_samples": row.val_samples,
+        "test_samples": row.test_samples,
+        "feedback_samples_used": row.feedback_samples_used,
+        "training_platform": row.training_platform,
+        "training_device": row.training_device,
+        "notes": row.notes,
+        "status": row.status,
+        "created_at": _serialize_datetime(row.created_at),
     }
 
 
@@ -330,38 +406,30 @@ def register_current_model_from_metadata() -> dict | None:
             .filter(ModelRegistry.model_version == model_version, ModelRegistry.status == "deployed")
             .first()
         )
-        if existing:
-            return {
-                "id": existing.id,
-                "model_version": existing.model_version,
-                "model_name": existing.model_name,
-                "artifact_path": existing.artifact_path,
-                "accuracy": existing.accuracy,
-                "macro_f1": existing.macro_f1,
-                "status": existing.status,
-                "created_at": _serialize_datetime(existing.created_at),
-            }
-
-        row = ModelRegistry(
-            id=_new_id(),
-            model_version=model_version,
-            model_name=metadata.get("model_name", "unknown"),
-            artifact_path=os.getenv("MODEL_PATH", f"models/model_{CURRENT_MODEL_VERSION}.pt"),
-            accuracy=metadata.get("accuracy"),
-            macro_f1=metadata.get("macro_f1"),
-            status="deployed",
-            created_at=datetime.utcnow(),
-        )
-        session.add(row)
+        row = existing or ModelRegistry(id=_new_id(), model_version=model_version, created_at=datetime.utcnow())
+        row.model_name = metadata.get("model_name", "unknown")
+        row.artifact_path = os.getenv("MODEL_PATH", f"models/model_{CURRENT_MODEL_VERSION}.pt")
+        row.accuracy = metadata.get("accuracy")
+        row.macro_f1 = metadata.get("macro_f1")
+        row.dataset_name = metadata.get("dataset")
+        row.dataset_version = metadata.get("dataset_version")
+        row.num_classes = metadata.get("num_classes")
+        row.input_size = metadata.get("input_size")
+        row.epochs = metadata.get("epochs")
+        row.batch_size = metadata.get("batch_size")
+        row.learning_rate = metadata.get("learning_rate")
+        row.optimizer = metadata.get("optimizer")
+        row.scheduler = metadata.get("scheduler")
+        row.train_samples = metadata.get("train_samples")
+        row.val_samples = metadata.get("val_samples")
+        row.test_samples = metadata.get("test_samples")
+        row.feedback_samples_used = metadata.get("feedback_samples_used")
+        row.training_platform = metadata.get("training_platform")
+        row.training_device = metadata.get("training_device")
+        row.notes = metadata.get("notes")
+        row.status = "deployed"
+        if not existing:
+            session.add(row)
         session.commit()
         session.refresh(row)
-        return {
-            "id": row.id,
-            "model_version": row.model_version,
-            "model_name": row.model_name,
-            "artifact_path": row.artifact_path,
-            "accuracy": row.accuracy,
-            "macro_f1": row.macro_f1,
-            "status": row.status,
-            "created_at": _serialize_datetime(row.created_at),
-        }
+        return _model_registry_to_dict(row)

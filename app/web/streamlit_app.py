@@ -1,4 +1,3 @@
-import json
 import os
 from pathlib import Path
 
@@ -7,8 +6,6 @@ import requests
 import streamlit as st
 
 API_BASE_URL = os.getenv("API_BASE_URL") or os.getenv("API_URL", "http://localhost:8000")
-CURRENT_MODEL_VERSION = os.getenv("CURRENT_MODEL_VERSION", "v1")
-MODEL_METADATA_PATH = Path(os.getenv("MODEL_METADATA_PATH", "models/model_v1_metadata.json"))
 
 st.set_page_config(page_title="AgriMLOps PlantWild", page_icon="🌱", layout="wide")
 
@@ -29,28 +26,6 @@ def api_get(path: str) -> dict | None:
     except requests.RequestException as exc:
         st.error(f"Gagal menghubungi API: {exc}")
         return None
-
-
-def load_model_registry_rows(current_version: str) -> list[dict]:
-    rows = []
-    for version in ["v1", "v2"]:
-        metadata_path = Path(f"models/model_{version}_metadata.json")
-        if not metadata_path.exists():
-            continue
-        with metadata_path.open("r", encoding="utf-8") as file:
-            metadata = json.load(file)
-        rows.append(
-            {
-                "version": version,
-                "status": "deployed" if version == current_version else "candidate",
-                "model_name": metadata.get("model_name", "-"),
-                "accuracy": metadata.get("accuracy", "-"),
-                "macro_f1": metadata.get("macro_f1", "-"),
-                "feedback_samples_used": metadata.get("feedback_samples_used", "-"),
-                "created_at": metadata.get("created_at", "-"),
-            }
-        )
-    return rows
 
 
 if page == "Diagnosis Tanaman":
@@ -187,21 +162,39 @@ elif page == "Active Learning Queue":
 else:
     st.header("Model Registry")
     metadata = api_get("/model/current")
-    if not metadata and MODEL_METADATA_PATH.exists():
-        with MODEL_METADATA_PATH.open("r", encoding="utf-8") as file:
-            metadata = json.load(file)
-
     if metadata:
-        current_version = metadata.get("current_model_version") or metadata.get("model_version") or CURRENT_MODEL_VERSION
+        current_version = metadata.get("current_model_version") or metadata.get("model_version")
         col1, col2, col3 = st.columns(3)
         col1.metric("Current Model Version", current_version)
         col2.metric("Num Classes", metadata.get("num_classes", "-"))
         col3.metric("Input Size", metadata.get("input_size", "-"))
 
-        registry_rows = load_model_registry_rows(current_version)
+        registry_response = api_get("/model/registry")
+        registry_rows = registry_response.get("items", []) if registry_response else []
         if registry_rows:
             st.subheader("Registered Artifacts")
-            st.dataframe(pd.DataFrame(registry_rows), use_container_width=True)
+            columns = [
+                "version",
+                "status",
+                "model_name",
+                "accuracy",
+                "macro_f1",
+                "epochs",
+                "batch_size",
+                "learning_rate",
+                "optimizer",
+                "scheduler",
+                "input_size",
+                "num_classes",
+                "train_samples",
+                "val_samples",
+                "test_samples",
+                "training_platform",
+                "training_device",
+                "created_at",
+                "notes",
+            ]
+            st.dataframe(pd.DataFrame(registry_rows).reindex(columns=columns), use_container_width=True)
 
         st.subheader("Detail Model")
         st.write(
