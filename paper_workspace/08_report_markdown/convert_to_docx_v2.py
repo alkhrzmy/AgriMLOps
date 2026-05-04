@@ -5,9 +5,10 @@ import shutil
 from pathlib import Path
 
 from docx import Document
+from docx.enum.section import WD_SECTION_START
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT, WD_CELL_VERTICAL_ALIGNMENT
-from docx.shared import Inches, Pt
+from docx.shared import Cm, Inches, Pt
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
@@ -32,6 +33,9 @@ SECTION_FILES = [
     REPORT_DIR / "lampiran" / "lampiran.md",
 ]
 
+BODY_START = REPORT_DIR / "bab1" / "pendahuluan.md"
+INCLUDE_LAMPIRAN = False
+
 
 def set_run_font(run, size=12, bold=False, italic=False):
     run.font.name = "Times New Roman"
@@ -45,7 +49,7 @@ def style_paragraph(paragraph, align=None):
     if align is not None:
         paragraph.alignment = align
     paragraph.paragraph_format.line_spacing = 1.15
-    paragraph.paragraph_format.space_after = Pt(6)
+    paragraph.paragraph_format.space_after = Pt(3)
     for run in paragraph.runs:
         if run.font.size is None:
             set_run_font(run)
@@ -68,13 +72,16 @@ def set_cell_margins(cell, top=80, start=80, bottom=80, end=80):
 
 
 def add_text_with_inline_format(paragraph, text: str, size=12):
-    parts = re.split(r"(\*\*.*?\*\*)", text)
+    parts = re.split(r"(\*\*.*?\*\*|\*[^*]+\*)", text)
     for part in parts:
         if not part:
             continue
         if part.startswith("**") and part.endswith("**"):
             run = paragraph.add_run(part[2:-2])
             set_run_font(run, size=size, bold=True)
+        elif part.startswith("*") and part.endswith("*"):
+            run = paragraph.add_run(part[1:-1])
+            set_run_font(run, size=size, italic=True)
         else:
             run = paragraph.add_run(part)
             set_run_font(run, size=size)
@@ -133,7 +140,7 @@ def add_image(doc, image_rel_path: str, alt_text: str):
     paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
     run = paragraph.add_run()
     try:
-        run.add_picture(str(img_path), width=Inches(5.7))
+        run.add_picture(str(img_path), width=Inches(4.65))
     except Exception:
         run.add_text(f"[Gagal memasukkan gambar: {image_rel_path}]")
     style_paragraph(paragraph, WD_ALIGN_PARAGRAPH.CENTER)
@@ -155,7 +162,7 @@ def add_source(doc, text: str):
     run = paragraph.add_run(text)
     set_run_font(run, size=9, italic=True)
     paragraph.paragraph_format.line_spacing = 1.15
-    paragraph.paragraph_format.space_after = Pt(6)
+    paragraph.paragraph_format.space_after = Pt(3)
 
 
 def add_markdown_file(doc, path: Path):
@@ -209,7 +216,7 @@ def add_markdown_file(doc, path: Path):
             continue
         if line.startswith("- ") or re.match(r"\d+\. ", line):
             p = doc.add_paragraph(style=None)
-            p.paragraph_format.left_indent = Inches(0.25)
+            p.paragraph_format.left_indent = Inches(0.18)
             add_text_with_inline_format(p, line, size=12)
             style_paragraph(p)
             i += 1
@@ -243,13 +250,23 @@ def add_cover(doc):
     doc.add_page_break()
 
 
+def apply_section_format(section) -> None:
+    section.top_margin = Cm(3)
+    section.bottom_margin = Cm(3)
+    section.left_margin = Cm(4)
+    section.right_margin = Cm(3)
+
+
+def add_body_section(doc):
+    section = doc.add_section(WD_SECTION_START.NEW_PAGE)
+    apply_section_format(section)
+    return section
+
+
 def main():
     doc = Document()
     for section in doc.sections:
-        section.top_margin = Inches(1)
-        section.bottom_margin = Inches(1)
-        section.left_margin = Inches(1.18)
-        section.right_margin = Inches(1)
+        apply_section_format(section)
     normal = doc.styles["Normal"]
     normal.font.name = "Times New Roman"
     normal.font.size = Pt(12)
@@ -258,9 +275,14 @@ def main():
         style.font.name = "Times New Roman"
         style.font.size = Pt(12)
     add_cover(doc)
-    for idx, file in enumerate(SECTION_FILES):
+    body_started = False
+    files = [f for f in SECTION_FILES if INCLUDE_LAMPIRAN or "lampiran" not in f.parts]
+    for idx, file in enumerate(files):
+        if file == BODY_START and not body_started:
+            add_body_section(doc)
+            body_started = True
         add_markdown_file(doc, file)
-        if idx < len(SECTION_FILES) - 1:
+        if idx < len(files) - 1:
             doc.add_page_break()
     doc.save(OUTPUT_FILE)
     shutil_target = ROOT / "report" / "AgriMLOps_KTI_Final.docx"

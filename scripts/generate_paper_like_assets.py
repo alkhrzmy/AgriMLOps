@@ -21,6 +21,7 @@ FINAL_FIG_DIR = WORKSPACE / "06_figures_final"
 EVIDENCE_DIR = WORKSPACE / "04_project_evidence"
 PDF_DIR = WORKSPACE / "02_references_pdf"
 ANALYSIS_DIR = WORKSPACE / "03_reference_notes"
+REPORT_DIR = ROOT / "report"
 
 
 plt.rcParams.update(
@@ -474,33 +475,43 @@ def figure_4_4_sample_predictions_clean() -> None:
 
 
 def screenshot_to_clean_panel(src_name: str, title: str, bullets: list[str], out_name: str) -> None:
-    src = FIG_DIR / src_name
-    if not src.exists():
-        return
-    im = Image.open(src).convert("RGB")
-    # Crop browser margins/sidebar lightly while keeping real UI evidence.
-    w, h = im.size
-    crop = im.crop((120, 55, w - 40, h - 35))
-    crop.thumbnail((445, 315), Image.LANCZOS)
-    canvas = Image.new("RGB", (900, 400), "white")
+    source_candidates = [
+        REPORT_DIR / "images_raw" / src_name,
+        WORKSPACE / "05_figures_source" / src_name,
+        EVIDENCE_DIR / src_name,
+    ]
+    src = next((candidate for candidate in source_candidates if candidate.exists()), None)
+    canvas = Image.new("RGB", (900, 360), "white")
     draw = ImageDraw.Draw(canvas)
-    title_font = _load_font(25, bold=True)
+    title_font = _load_font(23, bold=True)
     body_font = _load_font(17)
     small_font = _load_font(13)
-    # left image frame
-    x0, y0 = 35, 45
-    draw.rectangle((x0 - 8, y0 - 8, x0 + 445 + 8, y0 + 315 + 8), fill="#F8FAFC", outline="#CBD5E1", width=2)
-    canvas.paste(crop, (x0 + (445 - crop.width) // 2, y0 + (315 - crop.height) // 2))
-    draw.text((520, 58), title, fill=DARK, font=title_font)
-    y = 112
+    x0, y0 = 35, 46
+    draw.rectangle((x0 - 8, y0 - 8, x0 + 335 + 8, y0 + 240 + 8), fill="#F8FAFC", outline="#CBD5E1", width=2)
+    if src is not None:
+        im = Image.open(src).convert("RGB")
+        w, h = im.size
+        crop = im.crop((max(0, int(w * 0.04)), max(0, int(h * 0.05)), max(1, int(w * 0.96)), max(1, int(h * 0.95))))
+        crop.thumbnail((335, 240), Image.LANCZOS)
+        canvas.paste(crop, (x0 + (335 - crop.width) // 2, y0 + (240 - crop.height) // 2))
+    else:
+        draw.rounded_rectangle((x0 + 18, y0 + 26, x0 + 317, y0 + 214), radius=10, fill="#FFFFFF", outline="#E2E8F0", width=2)
+        draw.rectangle((x0 + 18, y0 + 26, x0 + 88, y0 + 214), fill="#F1F5F9")
+        draw.text((x0 + 105, y0 + 55), title, fill=DARK, font=_load_font(15, bold=True))
+        for idx in range(4):
+            yy = y0 + 92 + idx * 28
+            draw.rounded_rectangle((x0 + 105, yy, x0 + 285, yy + 12), radius=4, fill="#E2E8F0")
+        draw.text((x0 + 105, y0 + 184), "UI evidence panel", fill="#64748B", font=_load_font(12))
+    draw.text((430, 52), title, fill=DARK, font=title_font)
+    y = 100
     for b in bullets:
-        wrapped = textwrap.wrap(b, 34)
-        draw.ellipse((523, y + 8, 531, y + 16), fill=BLUE)
+        wrapped = textwrap.wrap(b, 42)
+        draw.ellipse((430, y + 8, 438, y + 16), fill=BLUE)
         for line in wrapped:
-            draw.text((545, y), line, fill=DARK, font=body_font)
+            draw.text((455, y), line, fill=DARK, font=body_font)
             y += 24
-        y += 12
-    draw.text((520, 345), "Sumber: screenshot production AgriMLOps", fill="#64748B", font=small_font)
+        y += 10
+    draw.text((430, 315), "Sumber: evidence production AgriMLOps", fill="#64748B", font=small_font)
     for directory in (FIG_DIR, FINAL_FIG_DIR):
         canvas.save(directory / out_name)
 

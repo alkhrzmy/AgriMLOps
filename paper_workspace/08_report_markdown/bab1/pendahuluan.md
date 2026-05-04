@@ -3,62 +3,38 @@
 
 ## 1.1 Latar Belakang
 
-Pertanian merupakan salah satu sektor paling penting dalam perekonomian global, menyediakan pangan bagi populasi dunia yang terus bertambah. Namun, sektor ini menghadapi berbagai tantangan signifikan, salah satunya adalah serangan penyakit pada tanaman yang dapat menyebabkan kerugian hasil panen yang besar. Organisasi Pangan dan Pertanian (FAO) memperkirakan bahwa penyakit tanaman bertanggung jawab atas kehilangan hasil panen hingga 40% secara global setiap tahunnya (Shoaib et al., 2023). Kerugian ini tidak hanya berdampak pada ketahanan pangan tetapi juga pada ekonomi petani dan kesejahteraan masyarakat secara luas.
+Penyakit tanaman masih menjadi ancaman penting bagi ketahanan pangan karena dapat menurunkan hasil panen dan pendapatan petani. Shoaib et al. (2023) menjelaskan bahwa organisme pengganggu tanaman dapat menyebabkan kehilangan hasil yang besar, sedangkan Wei et al. (2024) menekankan bahwa pengenalan penyakit secara cepat diperlukan agar kerusakan tidak meluas. Kebutuhan tersebut sejalan dengan arah inovasi pertanian berbasis teknologi, yaitu menyediakan alat bantu diagnosis yang dapat dipakai secara lebih cepat, murah, dan konsisten oleh pengguna lapangan.
 
-Secara tradisional, diagnosis penyakit tanaman dilakukan secara manual dengan mengamati gejala visual pada daun, batang, atau buah tanaman. Metode ini bergantung pada keahlian ahli pertanian atau penyuluh lapangan yang memiliki pengetahuan mendalam tentang berbagai jenis penyakit tanaman. Namun, pendekatan manual memiliki beberapa keterbatasan: membutuhkan waktu yang lama, subjektif, bergantung pada ketersediaan ahli, dan tidak dapat diimplementasikan secara skala besar (Upadhyay et al., 2025). Di wilayah dengan akses terbatas ke layanan ekstensi pertanian, petani seringkali tidak dapat mendapatkan diagnosis yang cepat dan akurat, sehingga penanganan penyakit menjadi terlambat dan kerugian menjadi lebih besar.
+Diagnosis penyakit tanaman secara manual umumnya dilakukan melalui pengamatan gejala visual pada daun, batang, atau buah. Cara ini tetap penting, tetapi hasilnya bergantung pada ketersediaan ahli, pengalaman pengamat, dan kondisi lapangan. Rahman et al. (2025) juga mencatat bahwa pemeriksaan manual cenderung memakan waktu dan sulit diskalakan. Pada wilayah dengan akses penyuluh yang terbatas, keterlambatan diagnosis dapat membuat penanganan penyakit tidak tepat waktu.
 
-Perkembangan teknologi deep learning dan computer vision dalam dekade terakhir telah membuka peluang baru untuk diagnosis penyakit tanaman yang otomatis dan akurat. Deep learning, khususnya Convolutional Neural Networks (CNN), telah menunjukkan performa luar biasa dalam berbagai tugas klasifikasi gambar, termasuk deteksi penyakit tanaman (Shoaib et al., 2023). Berbagai studi telah melaporkan akurasi di atas 90% untuk deteksi penyakit tanaman menggunakan model deep learning yang dilatih pada dataset seperti PlantVillage (Wang et al., 2025). Namun, sebagian besar penelitian ini dilakukan dalam lingkungan terkontrol dengan gambar yang diambil di laboratorium atau kondisi yang ideal, yang tidak mencerminkan kondisi nyata di lapangan (in-the-wild).
+Deep learning memberi peluang untuk mengenali pola visual penyakit tanaman secara otomatis. Berbagai penelitian menunjukkan bahwa CNN dan transfer learning mampu mencapai performa tinggi pada data citra tanaman (Shoaib et al., 2023; Upadhyay et al., 2025). Akan tetapi, performa yang baik pada dataset laboratorium belum selalu mencerminkan kondisi lapangan. Wei et al. (2024) menunjukkan bahwa citra in-the-wild memiliki latar belakang kompleks, pencahayaan beragam, sudut pengambilan tidak seragam, serta variasi gejala yang tinggi. Kondisi tersebut menyebabkan model lebih sulit melakukan generalisasi.
 
-Dataset yang digunakan dalam penelitian sebelumnya seringkali "menggampangkan" kondisi real-world dengan menggunakan gambar yang diambil dengan pencahayaan yang baik, latar belakang yang bersih, dan sudut pengambilan yang optimal (Xu et al., 2024). Dalam praktiknya, gambar yang diambil di lapangan memiliki variasi yang jauh lebih besar: pencahayaan yang tidak seragam, latar belakang yang kompleks, kondisi cuaca yang bervariasi, dan kualitas kamera yang berbeda-beda (Wei et al., 2024). Hal ini menyebabkan model yang dilatih pada dataset "bersih" sering gagal saat dideploy di lingkungan nyata, sebuah fenomena yang dikenal sebagai domain shift (Wu et al., 2023).
+Tantangan berikutnya adalah pengelolaan model setelah sistem digunakan. Model pembelajaran mesin tidak cukup hanya dilatih sekali, karena distribusi data dapat berubah ketika sistem menerima citra baru dari lingkungan nyata. Behl (2025) menjelaskan bahwa MLOps dibutuhkan untuk menghubungkan pelatihan, deployment, monitoring, versioning, dan pembaruan model. Tanpa alur operasional tersebut, model yang awalnya baik dapat menurun kualitasnya dan sulit dilacak perubahannya.
 
-Selain tantangan dataset, implementasi sistem diagnosis penyakit tanaman berbasis deep learning dalam produksi juga menghadapi tantangan dalam pengelolaan siklus hidup model (model lifecycle). Model machine learning tidak hanya perlu dilatih dan dideploy sekali, tetapi perlu dipantau kinerjanya secara terus-menerus, diperbarui dengan data baru, dan dikelola versinya untuk memastikan kualitas prediksi tetap optimal (Behl, 2025). Pendekatan tradisional yang hanya fokus pada pelatihan model tanpa mempertimbangkan aspek operasional seringkali gagal dalam produksi karena model mengalami degradation, drift, atau tidak dapat beradaptasi dengan kondisi baru.
+Active learning dapat melengkapi MLOps karena sistem dapat memprioritaskan prediksi yang tidak pasti untuk divalidasi. Dong et al. (2023) menekankan pentingnya pembelajaran dinamis pada deteksi penyakit tanaman ketika sistem menghadapi data baru. Dalam penelitian ini, active learning tidak diklaim sebagai open-world detection penuh, tetapi digunakan sebagai mekanisme awal untuk mencatat prediksi ber-confidence rendah, meminta validasi label, dan menyiapkan data retraining.
 
-Machine Learning Operations (MLOps) muncul sebagai disiplin baru yang menggabungkan praktik DevOps dengan machine learning untuk mengelola siklus hidup model secara end-to-end (Behl, 2025). MLOps mencakup aspek seperti continuous integration dan deployment (CI/CD), monitoring model, deteksi drift, model registry, dan automated retraining. Implementasi MLOps memungkinkan model machine learning untuk dideploy, dipantau, dan diperbarui secara sistematis, memastikan kinerja model tetap optimal dalam jangka panjang.
-
-Konsep active learning merupakan komponen penting dalam MLOps untuk sistem yang beroperasi di lingkungan yang dinamis. Active learning memungkinkan sistem untuk secara selektif meminta label pada data yang paling informatif, seperti prediksi dengan confidence rendah, sehingga meningkatkan efisiensi proses labeling (Dong et al., 2023). Dalam konteks diagnosis penyakit tanaman, active learning dapat digunakan untuk mengidentifikasi prediksi yang tidak pasti dan meminta validasi dari ahli pertanian, kemudian menggunakan data yang divalidasi tersebut untuk retraining model secara iteratif. Pendekatan ini tidak hanya meningkatkan akurasi model tetapi juga mengurangi biaya labeling dengan fokus pada data yang paling bernilai.
-
-Dataset PlantWild (Wei et al., 2024) merupakan dataset in-the-wild yang menyediakan gambar dan deskripsi teks untuk berbagai penyakit tanaman yang diambil dalam kondisi lapangan nyata. Dataset ini menyoroti tantangan small inter-class discrepancy dan large intra-class variance yang umum di lapangan, di mana gambar dari kelas yang sama dapat terlihat sangat berbeda karena variasi kondisi, sementara gambar dari kelas berbeda dapat terlihat mirip. PlantWild menyediakan baseline yang realistis untuk mengembangkan dan menguji sistem diagnosis penyakit tanaman yang robust terhadap kondisi lapangan.
-
-Model EfficientNetV2-B0 telah terbukti memberikan keseimbangan yang baik antara akurasi dan efisiensi komputasi, menjadikannya cocok untuk deployment pada berbagai platform termasuk mobile dan edge devices (Upadhyay et al., 2025). Model ini dapat dilatih menggunakan transfer learning dari ImageNet, mengurangi waktu dan sumber daya yang dibutuhkan untuk pelatihan sambil tetap mencapai performa yang kompetitif.
-
-Deployment sistem pada cloud infrastructure seperti DigitalOcean Droplet dengan Docker Compose memungkinkan skalabilitas dan aksesibilitas yang mudah. Docker containerization memastikan konsistensi lingkungan antara development dan production, sementara cloud deployment menyediakan akses global dan kemudahan pemeliharaan (Behl, 2025).
-
-Berdasarkan latar belakang tersebut, penelitian ini bertujuan untuk mengimplementasikan sistem diagnosis penyakit tanaman berbasis deep learning dengan mengintegrasikan MLOps lifecycle dan active learning untuk pengelolaan model yang berkelanjutan, serta mendeploy sistem tersebut pada cloud infrastructure untuk akses yang luas.
+Berdasarkan masalah tersebut, penelitian ini mengembangkan AgriMLOps sebagai prototipe sistem diagnosis penyakit tanaman berbasis EfficientNetV2-B0 pada dataset PlantWild. Fokus penelitian diarahkan pada tiga hal: implementasi model diagnosis, integrasi siklus MLOps, dan penerapan active learning queue untuk pembaruan model secara terkendali. Deployment pada server cloud digunakan sebagai bukti kelayakan akses sistem, tetapi bukan tujuan penelitian yang berdiri sendiri.
 
 ## 1.2 Rumusan Masalah
 
-Berdasarkan latar belakang yang telah diuraikan, rumusan masalah dalam penelitian ini adalah:
+Rumusan masalah penelitian ini adalah sebagai berikut.
 
-1. Bagaimana mengimplementasikan sistem diagnosis penyakit tanaman menggunakan deep learning (EfficientNetV2-B0) dengan dataset in-the-wild (PlantWild)?
-2. Bagaimana mengintegrasikan Machine Learning Operations (MLOps) lifecycle yang mencakup inference, logging, feedback collection, active learning queue, monitoring, dan model registry untuk pengelolaan model yang berkelanjutan?
-3. Bagaimana menerapkan active learning untuk peningkatan kualitas model secara iteratif melalui validasi prediksi yang tidak pasti?
-4. Bagaimana mendeploy sistem pada cloud infrastructure (DigitalOcean Droplet) dengan Docker Compose untuk akses yang luas dan skalabilitas?
+1. Bagaimana mengimplementasikan model deep learning untuk diagnosis penyakit tanaman pada citra in-the-wild menggunakan dataset PlantWild?
+2. Bagaimana mengintegrasikan komponen MLOps, yaitu inference, prediction logging, feedback collection, monitoring, dan model registry, agar siklus hidup model dapat dilacak?
+3. Bagaimana menerapkan active learning queue untuk memvalidasi prediksi yang tidak pasti dan menggunakan hasil validasi tersebut pada retraining model?
 
 ## 1.3 Tujuan Penelitian
 
-Tujuan penelitian ini adalah:
+Penelitian ini bertujuan menghasilkan prototipe AgriMLOps yang tidak hanya berfungsi sebagai model klasifikasi, tetapi juga sebagai sistem yang layak dikembangkan menuju alat bantu diagnosis bagi pengguna lapangan. Tujuan khusus penelitian ini adalah sebagai berikut.
 
-1. Mengimplementasikan sistem diagnosis penyakit tanaman menggunakan EfficientNetV2-B0 dengan dataset PlantWild subset (15 kelas) untuk klasifikasi penyakit tanaman in-the-wild.
-2. Mengintegrasikan MLOps lifecycle lengkap yang mencakup: (a) model inference dengan FastAPI, (b) prediction logging dengan SQLite, (c) user feedback collection, (d) active learning queue untuk validasi prediksi, (e) monitoring dashboard, dan (f) model registry untuk version management.
-3. Menerapkan active learning queue untuk mengidentifikasi dan memvalidasi prediksi dengan confidence rendah atau user unsure, kemudian menggunakan data yang divalidasi untuk retraining model secara iteratif.
-4. Mendeploy sistem pada DigitalOcean Droplet dengan Docker Compose untuk menyediakan akses web (Streamlit) dan API (FastAPI) yang skalabel dan mudah diakses.
+1. Mengimplementasikan model EfficientNetV2-B0 untuk diagnosis penyakit tanaman berbasis citra PlantWild subset yang merepresentasikan kondisi in-the-wild.
+2. Mengintegrasikan siklus MLOps melalui API inference, pencatatan prediksi, pengumpulan feedback, monitoring, dan model registry agar perkembangan model dapat dikelola secara sistematis.
+3. Menerapkan active learning queue dan controlled validated feedback simulation untuk menguji alur validasi data, export feedback, retraining, dan perbandingan model v1 sampai v3.
 
 ## 1.4 Manfaat Penelitian
 
-### 1.4.1 Manfaat Teoretis
+Secara teoretis, penelitian ini memberikan contoh implementasi MLOps pada domain diagnosis penyakit tanaman yang masih jarang dibahas sebagai platform end-to-end. Posisi penelitian ini melengkapi studi yang berfokus pada akurasi model, dataset in-the-wild, atau aplikasi web, dengan menambahkan logging, feedback, active learning queue, monitoring, dan model registry dalam satu alur kerja.
 
-Penelitian ini memberikan kontribusi teoretis sebagai berikut:
+Secara praktis, prototipe ini dapat menjadi dasar pengembangan alat bantu diagnosis bagi petani atau penyuluh. Sistem web memungkinkan pengguna mengunggah citra tanaman, memperoleh prediksi, dan memberikan feedback. Walaupun feedback pada penelitian ini masih berupa simulasi tervalidasi, alur tersebut menunjukkan bagaimana sistem dapat disiapkan untuk menerima validasi ahli atau feedback pengguna lapangan pada tahap berikutnya.
 
-1. **Kontribusi pada Literatur MLOps untuk Aplikasi Pertanian**: Mengisi gap literatur dengan mendemonstrasikan implementasi end-to-end MLOps lifecycle khusus untuk diagnosis penyakit tanaman, yang sebelumnya belum banyak dieksplorasi secara komprehensif.
-2. **Demonstrasi Active Learning dalam Konteks Nyata**: Menunjukkan bagaimana active learning dapat diterapkan dalam sistem diagnosis penyakit tanaman untuk peningkatan kualitas model secara iteratif dengan efisiensi labeling yang optimal.
-3. **Studi Kasus In-the-Wild Deployment**: Memberikan studi kasus praktis tentang tantangan dan solusi dalam deployment model deep learning untuk diagnosis penyakit tanaman dalam kondisi lapangan nyata.
-
-### 1.4.2 Manfaat Praktis
-
-Penelitian ini memberikan manfaat praktis sebagai berikut:
-
-1. **Sistem Diagnosis Penyakit Tanaman yang Dapat Digunakan**: Menghasilkan sistem diagnosis penyakit tanaman yang dapat digunakan secara langsung oleh petani atau praktisi pertanian melalui antarmuka web yang mudah diakses.
-2. **Template MLOps untuk Proyek Machine Learning Lainnya**: Menyediakan template dan best practices implementasi MLOps yang dapat diadaptasi untuk proyek machine learning lainnya di bidang pertanian atau domain lain.
-3. **Panduan Deployment Cloud untuk Aplikasi AI**: Memberikan panduan praktis tentang deployment aplikasi AI pada cloud infrastructure dengan Docker Compose, yang dapat digunakan sebagai referensi untuk deployment sistem serupa.
-4. **Model Registry dan Version Management**: Menunjukkan praktik terbaik dalam pengelolaan model versioning dan comparison, memudahkan tracking dan rollback jika diperlukan.
-5. **Monitoring dan Observability**: Mendemonstrasikan implementasi monitoring dashboard untuk tracking kinerja model, feedback distribution, dan sistem health secara real-time.
+Secara inovatif, AgriMLOps mendukung orientasi pertanian berbasis teknologi karena menggabungkan model ringan, dashboard monitoring, dan mekanisme perbaikan model. Pendekatan ini relevan dengan upaya pengurangan kehilangan hasil panen melalui diagnosis yang lebih cepat dan terdokumentasi.
