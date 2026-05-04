@@ -28,11 +28,11 @@ from tqdm.auto import tqdm
 
 SEED = 42
 REPO_ID = "uqtwei2/PlantWild"
-MODEL_VERSION = "v2"
+MODEL_VERSION = "v3"
 USE_VALIDATED_FEEDBACK = True
 FEEDBACK_ZIP_PATH = "/kaggle/input/agrimlops-feedback/validated_feedback.zip"
-EXISTING_LABEL_MAP_PATH = "/kaggle/input/agrimlops-v1/label_map.json"
-BASE_MODEL_PATH = "/kaggle/input/agrimlops-v1/model_v1.pt"
+EXISTING_LABEL_MAP_PATH = "/kaggle/input/agrimlops-v2/label_map.json"
+BASE_MODEL_PATH = "/kaggle/input/agrimlops-v2/model_v2.pt"
 DATA_DIR = Path("/kaggle/working/plantwild")
 EXTRACT_DIR = Path("/kaggle/working/plantwild_extracted")
 FEEDBACK_EXTRACT_DIR = Path("/kaggle/working/validated_feedback")
@@ -357,7 +357,7 @@ base_model_path = Path(BASE_MODEL_PATH)
 base_model_version = None
 if base_model_path.exists():
     model.load_state_dict(torch.load(base_model_path, map_location=DEVICE))
-    base_model_version = "v1"
+    base_model_version = base_model_path.stem.replace("model_", "")
     print(f"Loaded base model weights from {base_model_path}")
 else:
     print("Base model weights not found. Starting from ImageNet pretrained weights.")
@@ -510,9 +510,15 @@ metadata = {
     "training_platform": "Kaggle Notebook",
     "training_device": "Kaggle GPU" if torch.cuda.is_available() else "CPU",
     "framework": "PyTorch + timm",
-    "pretrained_source": "model_v1.pt" if base_model_version else "ImageNet",
+    "pretrained_source": base_model_path.name if base_model_version else "ImageNet",
     "created_at": datetime.now(timezone.utc).isoformat(),
-    "notes": "retrained on Kaggle GPU using validated active learning feedback" if MODEL_VERSION != "v1" else "trained on Kaggle GPU",
+    "notes": (
+        "retrained using controlled validated feedback simulation + PlantWild subset"
+        if MODEL_VERSION == "v3" and feedback_samples_used
+        else "retrained on Kaggle GPU using validated active learning feedback"
+        if MODEL_VERSION != "v1"
+        else "trained on Kaggle GPU"
+    ),
 }
 with open(MODEL_DIR / f"model_{MODEL_VERSION}_metadata.json", "w", encoding="utf-8") as file:
     json.dump(metadata, file, indent=2)

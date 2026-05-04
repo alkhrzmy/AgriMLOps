@@ -79,14 +79,68 @@ reports/classification_report_v2.csv
 reports/retraining_dataset_summary_v2.json
 ```
 
+## Optional Controlled Feedback Simulation untuk v3
+
+Controlled feedback simulation digunakan untuk menguji retraining loop dengan dataset eksternal atau holdout berlabel sebelum feedback petani asli tersedia.
+
+Simulasi ini bukan feedback petani nyata dan tidak boleh diklaim sebagai data petani asli.
+
+Jalankan simulasi dari dataset berfolder label:
+
+```bash
+python scripts/simulate_validated_feedback.py \
+  --dataset-root /path/to/labeled_dataset \
+  --api-base-url http://159.65.139.148:8000 \
+  --max-images 50
+```
+
+Script hanya memproses folder label yang cocok dengan `models/label_map.json`. Prediksi salah atau low-confidence akan dikirim sebagai feedback lalu divalidasi otomatis sebagai controlled validated feedback.
+
+## Workflow v3 dengan Controlled Validated Feedback
+
+1. Jalankan `scripts/simulate_validated_feedback.py` terhadap production API.
+
+2. SSH ke droplet.
+
+3. Jalankan export validated feedback:
+
+```bash
+python scripts/export_validated_feedback.py
+```
+
+4. Download ZIP terbaru dari `data/retraining/`.
+
+5. Upload ZIP ke Kaggle sebagai feedback dataset.
+
+6. Train di Kaggle dengan konfigurasi:
+
+```python
+MODEL_VERSION = "v3"
+USE_VALIDATED_FEEDBACK = True
+FEEDBACK_ZIP_PATH = "/kaggle/input/agrimlops-feedback/validated_feedback.zip"
+EXISTING_LABEL_MAP_PATH = "/kaggle/input/agrimlops-v2/label_map.json"
+BASE_MODEL_PATH = "/kaggle/input/agrimlops-v2/model_v2.pt"
+```
+
+7. Pastikan metadata v3 mencatat:
+
+```text
+base_model_version: v2
+feedback_samples_used: > 0
+notes: retrained using controlled validated feedback simulation + PlantWild subset
+```
+
+8. Compare v2 vs v3 sebelum promote.
+
 ## Prinsip Data dan Evaluasi
 
 - Feedback user adalah weak label.
 - Ground truth baru hanya berasal dari validasi admin atau penyuluh.
+- Controlled feedback simulation berasal dari dataset eksternal/holdout berlabel, bukan feedback petani nyata.
 - Hanya item `active_learning_queue` dengan `status=validated` dan `validated_label` valid yang boleh masuk retraining.
 - Feedback tervalidasi hanya ditambahkan ke `train_df`.
 - Feedback tidak dimasukkan ke validation/test agar evaluasi tetap bersih.
-- `label_map.json` v1 harus dipakai ulang supaya output model tetap kompatibel dengan API dan UI.
+- `label_map.json` harus dipakai ulang supaya output model tetap kompatibel dengan API dan UI.
 
 ## Kenapa Tetap Termasuk MLOps Lifecycle
 
