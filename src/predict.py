@@ -1,5 +1,6 @@
 import json
 import os
+import time
 from functools import lru_cache
 from io import BytesIO
 from pathlib import Path
@@ -127,10 +128,13 @@ def predict_image(image_path_or_bytes) -> dict:
     image = _open_image(image_path_or_bytes)
     tensor = bundle["transform"](image).unsqueeze(0).to(bundle["device"])
 
+    # Measure inference time
+    start_time = time.time()
     with torch.no_grad():
         logits = bundle["model"](tensor)
         probabilities = torch.softmax(logits, dim=1)[0]
         top_probabilities, top_indices = torch.topk(probabilities, k=min(3, probabilities.numel()))
+    inference_time = time.time() - start_time
 
     top_k = []
     for confidence, index in zip(top_probabilities.cpu().tolist(), top_indices.cpu().tolist()):
@@ -150,4 +154,5 @@ def predict_image(image_path_or_bytes) -> dict:
         "top_k": top_k,
         "recommendation": get_recommendation(predicted_label),
         "needs_review": confidence < LOW_CONFIDENCE_THRESHOLD,
+        "inference_time_ms": round(inference_time * 1000, 2),
     }

@@ -32,6 +32,7 @@ class PredictionLog(Base):
     recommendation = Column(Text, nullable=False)
     needs_review = Column(Boolean, nullable=False, default=False)
     model_version = Column(String, nullable=True)
+    inference_time_ms = Column(Float, nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
 
@@ -100,6 +101,7 @@ def get_database_path() -> Path:
 def init_db() -> None:
     Base.metadata.create_all(bind=engine)
     ensure_model_registry_columns()
+    ensure_prediction_logs_columns()
 
 
 def ensure_model_registry_columns() -> None:
@@ -132,6 +134,21 @@ def ensure_model_registry_columns() -> None:
                 connection.execute(text(f"ALTER TABLE model_registry ADD COLUMN {column_name} {column_type}"))
 
 
+def ensure_prediction_logs_columns() -> None:
+    if not DATABASE_URL.startswith("sqlite"):
+        return
+
+    required_columns = {
+        "inference_time_ms": "FLOAT",
+    }
+
+    with engine.begin() as connection:
+        existing_columns = {row[1] for row in connection.execute(text("PRAGMA table_info(prediction_logs)"))}
+        for column_name, column_type in required_columns.items():
+            if column_name not in existing_columns:
+                connection.execute(text(f"ALTER TABLE prediction_logs ADD COLUMN {column_name} {column_type}"))
+
+
 def database_available() -> bool:
     try:
         init_db()
@@ -160,6 +177,7 @@ def _prediction_to_dict(row: PredictionLog) -> dict:
         "recommendation": row.recommendation,
         "needs_review": row.needs_review,
         "model_version": row.model_version,
+        "inference_time_ms": row.inference_time_ms,
         "created_at": _serialize_datetime(row.created_at),
     }
 
@@ -218,6 +236,7 @@ def log_prediction(
     recommendation: str,
     needs_review: bool,
     model_version: str | None,
+    inference_time_ms: float | None = None,
 ) -> dict:
     init_db()
     with SessionLocal() as session:
@@ -230,6 +249,7 @@ def log_prediction(
             recommendation=recommendation,
             needs_review=needs_review,
             model_version=model_version,
+            inference_time_ms=inference_time_ms,
             created_at=datetime.utcnow(),
         )
         session.add(row)

@@ -153,6 +153,7 @@ async def predict(file: UploadFile = File(...)) -> dict:
         recommendation=result["recommendation"],
         needs_review=result["needs_review"],
         model_version=model_version,
+        inference_time_ms=result.get("inference_time_ms"),
     )
 
     if result["needs_review"] or result["confidence"] < LOW_CONFIDENCE_THRESHOLD:
@@ -172,6 +173,7 @@ async def predict(file: UploadFile = File(...)) -> dict:
         "recommendation": result["recommendation"],
         "needs_review": result["needs_review"],
         "model_version": model_version,
+        "inference_time_ms": result.get("inference_time_ms"),
     }
 
 

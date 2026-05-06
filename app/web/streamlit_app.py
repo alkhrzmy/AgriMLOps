@@ -46,10 +46,11 @@ if page == "Diagnosis Tanaman":
     prediction = st.session_state.get("last_prediction")
     if prediction:
         st.subheader("Hasil Prediksi")
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns(4)
         col1.metric("Label", prediction.get("predicted_label", "-"))
         col2.metric("Confidence", f"{prediction.get('confidence', 0.0):.2%}")
         col3.metric("Model", prediction.get("model_version", "-"))
+        col4.metric("Inference Time", f"{prediction.get('inference_time_ms', 0):.2f} ms")
 
         if prediction.get("needs_review"):
             st.warning("Confidence rendah. Prediksi ini masuk active learning queue untuk validasi.")
