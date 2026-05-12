@@ -215,18 +215,6 @@ with logo_col:
         st.markdown("<div class=\"logo-caption\">Institut Teknologi Sumatera</div>", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
-st.markdown(
-        """
-        <div class="hero">
-                <div class="hero-title">Siap tampil di panggung finalis</div>
-                <div class="hero-body">
-                        Alur kerja end-to-end: diagnosis cepat, umpan balik terstruktur, validasi aktif, dan registri model yang jelas.
-                </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-)
-
 cards = st.columns(3)
 with cards[0]:
         st.markdown(
