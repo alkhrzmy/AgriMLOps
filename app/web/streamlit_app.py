@@ -5,17 +5,275 @@ import pandas as pd
 import requests
 import streamlit as st
 
+from team_logo_base64 import TEAM_LOGO_BASE64, TEAM_LOGO_MIME
 API_BASE_URL = os.getenv("API_BASE_URL") or os.getenv("API_URL", "http://localhost:8000")
+LOGO_URL = "https://upload.wikimedia.org/wikipedia/commons/e/ef/Logo_ITERA.png"
+APP_TITLE = "AgriMLOps PlantWild"
+APP_TAGLINE = "MVP diagnosis penyakit tanaman in-the-wild dengan feedback loop dan monitoring sederhana."
+TEAM_NAME = "Janji Mau Fokus TA Biar Cepet Lulus"
+st.set_page_config(page_title=APP_TITLE, page_icon="🌱", layout="wide")
 
-st.set_page_config(page_title="AgriMLOps PlantWild", page_icon="🌱", layout="wide")
+APP_CSS = """
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Fraunces:wght@600;700&display=swap');
 
-st.title("AgriMLOps PlantWild")
-st.caption("MVP diagnosis penyakit tanaman in-the-wild dengan feedback loop dan monitoring sederhana.")
+:root {
+    --ink: #101915;
+    --muted: #4f5d57;
+    --accent: #2f7d5c;
+    --accent-2: #8cc84b;
+    --paper: #f7f6f2;
+    --card: #ffffff;
+    --shadow: 0 18px 45px rgba(12, 26, 20, 0.12);
+    --ring: rgba(47, 125, 92, 0.18);
+}
+
+html, body, [class*="css"]  {
+    font-family: 'Space Grotesk', sans-serif !important;
+    color: var(--ink);
+}
+
+.stApp {
+    background: radial-gradient(circle at 12% 18%, #e7f1e7 0%, #f7f6f2 45%, #eef2ec 100%);
+}
+
+.stApp::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background-image: radial-gradient(rgba(47, 125, 92, 0.08) 1px, transparent 1px);
+    background-size: 18px 18px;
+    opacity: 0.55;
+    pointer-events: none;
+    z-index: 0;
+}
+
+section.main > div {
+    position: relative;
+    z-index: 1;
+}
+
+h1, h2, h3, h4 {
+    font-family: 'Fraunces', serif !important;
+    letter-spacing: 0.2px;
+    color: #0e1712;
+}
+
+.app-header {
+    background: var(--card);
+    border-radius: 24px;
+    padding: 28px 30px;
+    box-shadow: var(--shadow);
+    border: 1px solid rgba(16, 25, 21, 0.06);
+}
+
+.app-title {
+    font-size: 2.2rem;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.app-subtitle {
+    font-size: 1rem;
+    color: var(--muted);
+    margin-bottom: 14px;
+}
+
+.badge-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border-radius: 999px;
+    padding: 6px 14px;
+    background: rgba(47, 125, 92, 0.12);
+    color: #1b4e3a;
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+.hero {
+    margin: 22px 0 8px;
+    padding: 18px 22px;
+    background: linear-gradient(130deg, rgba(47, 125, 92, 0.12), rgba(140, 200, 75, 0.18));
+    border-radius: 20px;
+    border: 1px solid rgba(47, 125, 92, 0.12);
+    animation: fadeUp 0.7s ease;
+}
+
+.hero-title {
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.hero-body {
+    color: var(--muted);
+    line-height: 1.55;
+}
+
+.info-card {
+    background: var(--card);
+    border-radius: 18px;
+    padding: 16px 18px;
+    border: 1px solid rgba(16, 25, 21, 0.06);
+    box-shadow: 0 12px 30px rgba(14, 23, 18, 0.08);
+    min-height: 112px;
+}
+
+.info-card .card-title {
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.info-card .card-body {
+    color: var(--muted);
+    font-size: 0.92rem;
+}
+
+.section-lead {
+    color: var(--muted);
+    margin: 0 0 16px;
+}
+
+.logo-box {
+    text-align: right;
+}
+
+.logo-caption {
+    color: var(--muted);
+    font-size: 0.75rem;
+    margin-top: 6px;
+}
+
+.section-divider {
+    height: 1px;
+    margin: 18px 0 28px;
+    background: linear-gradient(90deg, rgba(47, 125, 92, 0.2), rgba(16, 25, 21, 0));
+}
+
+div[data-testid="metric-container"] {
+    background: var(--card);
+    border-radius: 16px;
+    padding: 12px 16px;
+    border: 1px solid rgba(16, 25, 21, 0.06);
+    box-shadow: 0 10px 24px rgba(14, 23, 18, 0.08);
+}
+
+button[kind="primary"], .stButton > button {
+    border-radius: 999px !important;
+    border: 1px solid rgba(47, 125, 92, 0.2) !important;
+    box-shadow: 0 10px 24px rgba(47, 125, 92, 0.22) !important;
+    font-weight: 600 !important;
+}
+
+section[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, rgba(47, 125, 92, 0.08), rgba(140, 200, 75, 0.08));
+    border-right: 1px solid rgba(16, 25, 21, 0.05);
+}
+
+.footer-note {
+    text-align: center;
+    color: var(--muted);
+    margin-top: 40px;
+    font-size: 0.82rem;
+}
+
+@keyframes fadeUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+</style>
+"""
+
+st.markdown(APP_CSS, unsafe_allow_html=True)
+
+header_col, logo_col = st.columns([0.78, 0.22], vertical_alignment="center")
+with header_col:
+        st.markdown(
+                f"""
+                <div class="app-header">
+                        <div class="app-title">{APP_TITLE}</div>
+                        <div class="app-subtitle">{APP_TAGLINE}</div>
+                        <div class="badge-row">
+                                <span class="badge">AI Diagnosis</span>
+                                <span class="badge">Active Learning</span>
+                                <span class="badge">Monitoring & Feedback</span>
+                        </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+        )
+with logo_col:
+        st.markdown("<div class=\"logo-box\">", unsafe_allow_html=True)
+        st.image(LOGO_URL, width=90)
+        st.markdown("<div class=\"logo-caption\">Institut Teknologi Sumatera</div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+st.markdown(
+        """
+        <div class="hero">
+                <div class="hero-title">Siap tampil di panggung finalis</div>
+                <div class="hero-body">
+                        Alur kerja end-to-end: diagnosis cepat, umpan balik terstruktur, validasi aktif, dan registri model yang jelas.
+                </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+)
+
+cards = st.columns(3)
+with cards[0]:
+        st.markdown(
+                """
+                <div class="info-card">
+                        <div class="card-title">Diagnosis Terukur</div>
+                        <div class="card-body">Prediksi lengkap dengan confidence, top-3, dan rekomendasi tindakan.</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+        )
+with cards[1]:
+        st.markdown(
+                """
+                <div class="info-card">
+                        <div class="card-title">Feedback Loop</div>
+                        <div class="card-body">Masukkan koreksi dari user untuk memperkuat data retraining.</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+        )
+with cards[2]:
+        st.markdown(
+                """
+                <div class="info-card">
+                        <div class="card-title">Monitoring Aktif</div>
+                        <div class="card-body">Pantau distribusi prediksi dan anomali confidence secara real-time.</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+        )
+
+st.markdown("<div class=\"section-divider\"></div>", unsafe_allow_html=True)
 
 page = st.sidebar.radio(
     "Menu",
-    ["Diagnosis Tanaman", "Dashboard Monitoring", "Active Learning Queue", "Model Registry"],
+    [
+        "Diagnosis Tanaman",
+        "Dashboard Monitoring",
+        "Active Learning Queue",
+        "Model Registry",
+        "Profil Tim",
+    ],
 )
+
+with st.sidebar:
+    st.caption("Gunakan menu di atas untuk berpindah fitur utama.")
 
 
 def api_get(path: str) -> dict | None:
@@ -28,8 +286,28 @@ def api_get(path: str) -> dict | None:
         return None
 
 
+def render_team_logo() -> None:
+    if not TEAM_LOGO_BASE64.strip():
+        st.info("Logo tim belum tersedia.")
+        return
+    logo_b64 = "".join(TEAM_LOGO_BASE64.split())
+    st.markdown(
+        f"""
+        <img
+            src="data:{TEAM_LOGO_MIME};base64,{logo_b64}"
+            style="width: 100%; max-width: 360px; border-radius: 16px; box-shadow: 0 12px 30px rgba(14, 23, 18, 0.08);"
+        />
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 if page == "Diagnosis Tanaman":
     st.header("Diagnosis Tanaman")
+    st.markdown(
+        "<p class=\"section-lead\">Unggah gambar tanaman untuk melihat prediksi penyakit dan rekomendasi tindakan.</p>",
+        unsafe_allow_html=True,
+    )
     uploaded_file = st.file_uploader("Upload foto tanaman", type=["jpg", "jpeg", "png"])
     if uploaded_file is not None:
         st.image(uploaded_file, caption="Preview gambar", use_container_width=True)
@@ -95,6 +373,10 @@ if page == "Diagnosis Tanaman":
 
 elif page == "Dashboard Monitoring":
     st.header("Dashboard Monitoring")
+    st.markdown(
+        "<p class=\"section-lead\">Ringkas performa model, confidence, dan antrian active learning.</p>",
+        unsafe_allow_html=True,
+    )
     summary = api_get("/monitoring/summary")
     if summary:
         col1, col2, col3, col4, col5 = st.columns(5)
@@ -122,6 +404,10 @@ elif page == "Dashboard Monitoring":
 
 elif page == "Active Learning Queue":
     st.header("Active Learning Queue")
+    st.markdown(
+        "<p class=\"section-lead\">Validasi kasus berisiko tinggi untuk meningkatkan kualitas dataset.</p>",
+        unsafe_allow_html=True,
+    )
     queue_response = api_get("/active-learning/queue")
     items = queue_response.get("items", []) if queue_response else []
     if not items:
@@ -160,8 +446,12 @@ elif page == "Active Learning Queue":
                     except requests.RequestException as exc:
                         st.error(f"Gagal validasi item: {exc}")
 
-else:
+elif page == "Model Registry":
     st.header("Model Registry")
+    st.markdown(
+        "<p class=\"section-lead\">Lihat metadata model aktif dan riwayat training yang terdaftar.</p>",
+        unsafe_allow_html=True,
+    )
     metadata = api_get("/model/current")
     if metadata:
         current_version = metadata.get("current_model_version") or metadata.get("model_version")
@@ -213,6 +503,71 @@ else:
     else:
         st.warning("Model metadata belum ditemukan. Jalankan training di Kaggle dan extract artifact ke folder models/.")
 
+elif page == "Profil Tim":
+    st.header("Profil Tim")
+    st.markdown(
+        "<p class=\"section-lead\">Perkenalan singkat tim dan identitas untuk presentasi finalis.</p>",
+        unsafe_allow_html=True,
+    )
+
+    team_cols = st.columns([0.55, 0.45])
+    with team_cols[0]:
+        st.markdown(
+            f"""
+            <div class="info-card">
+                <div class="card-title">Nama Tim</div>
+                <div class="card-body"><strong>{TEAM_NAME}</strong></div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.markdown("<div style=\"height:12px\"></div>", unsafe_allow_html=True)
+        st.markdown(
+            """
+            <div class="info-card">
+                <div class="card-title">Anggota</div>
+                <div class="card-body">
+                    1. Gymnastiar Al Khoarizmy (NIM 122450096)<br/>
+                    2. Feryadi Yulius (NIM 122450087)
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.markdown("<div style=\"height:12px\"></div>", unsafe_allow_html=True)
+        st.markdown(
+            """
+            <div class="info-card">
+                <div class="card-title">Institusi</div>
+                <div class="card-body">Institut Teknologi Sumatera</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.markdown("<div style=\"height:12px\"></div>", unsafe_allow_html=True)
+        st.markdown(
+            """
+            <div class="info-card">
+                <div class="card-title">Kontak</div>
+                <div class="card-body">gymnastiar.122450096@student.itera.ac.id</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with team_cols[1]:
+        st.markdown(
+            """
+            <div class="info-card">
+                <div class="card-title">Logo Tim</div>
+                <div class="card-body">Identitas visual untuk presentasi finalis.</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        render_team_logo()
+else:
+    st.warning("Halaman tidak ditemukan.")
+
 with st.sidebar:
     st.divider()
     st.caption(f"API: {API_BASE_URL}")
@@ -225,3 +580,7 @@ with st.sidebar:
             st.warning("API tidak merespons normal")
     except requests.RequestException:
         st.warning("API belum tersedia")
+
+st.markdown("<div class=\"footer-note\">AgriMLOps PlantWild - Finalist Showcase</div>", unsafe_allow_html=True)
+
+
