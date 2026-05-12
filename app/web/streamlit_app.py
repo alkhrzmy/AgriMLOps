@@ -9,7 +9,7 @@ from team_logo_base64 import TEAM_LOGO_BASE64, TEAM_LOGO_MIME
 API_BASE_URL = os.getenv("API_BASE_URL") or os.getenv("API_URL", "http://localhost:8000")
 LOGO_URL = "https://upload.wikimedia.org/wikipedia/commons/e/ef/Logo_ITERA.png"
 APP_TITLE = "AgriMLOps PlantWild"
-APP_TAGLINE = "MVP diagnosis penyakit tanaman in-the-wild dengan feedback loop dan monitoring sederhana."
+APP_TAGLINE = "Aplikasi web untuk diagnosis penyakit tanaman dari foto, dilengkapi feedback, monitoring, dan model registry."
 TEAM_NAME = "Janji Mau Fokus TA Biar Cepet Lulus"
 st.set_page_config(page_title=APP_TITLE, page_icon="🌱", layout="wide")
 
@@ -193,85 +193,31 @@ section[data-testid="stSidebar"] {
 
 st.markdown(APP_CSS, unsafe_allow_html=True)
 
-header_col, logo_col = st.columns([0.78, 0.22], vertical_alignment="center")
-with header_col:
-        st.markdown(
-                f"""
-                <div class="app-header">
-                        <div class="app-title">{APP_TITLE}</div>
-                        <div class="app-subtitle">{APP_TAGLINE}</div>
-                        <div class="badge-row">
-                                <span class="badge">AI Diagnosis</span>
-                                <span class="badge">Active Learning</span>
-                                <span class="badge">Monitoring & Feedback</span>
-                        </div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-        )
-with logo_col:
-        st.markdown("<div class=\"logo-box\">", unsafe_allow_html=True)
-        st.image(LOGO_URL, width=90)
-        st.markdown("<div class=\"logo-caption\">Institut Teknologi Sumatera</div>", unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
 
-cards = st.columns(3)
-with cards[0]:
-        st.markdown(
-                """
-                <div class="info-card">
-                        <div class="card-title">Diagnosis Terukur</div>
-                        <div class="card-body">Prediksi lengkap dengan confidence, top-3, dan rekomendasi tindakan.</div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-        )
-with cards[1]:
-        st.markdown(
-                """
-                <div class="info-card">
-                        <div class="card-title">Feedback Loop</div>
-                        <div class="card-body">Masukkan koreksi dari user untuk memperkuat data retraining.</div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-        )
-with cards[2]:
-        st.markdown(
-                """
-                <div class="info-card">
-                        <div class="card-title">Monitoring Aktif</div>
-                        <div class="card-body">Pantau distribusi prediksi dan anomali confidence secara real-time.</div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-        )
-
-st.markdown("<div class=\"section-divider\"></div>", unsafe_allow_html=True)
-
-page = st.sidebar.radio(
-    "Menu",
-    [
-        "Diagnosis Tanaman",
-        "Dashboard Monitoring",
-        "Active Learning Queue",
-        "Model Registry",
-        "Profil Tim",
-    ],
-)
-
-with st.sidebar:
-    st.caption("Gunakan menu di atas untuk berpindah fitur utama.")
-
-
-def api_get(path: str) -> dict | None:
+def api_get(path: str, show_error: bool = True) -> dict | None:
     try:
         response = requests.get(f"{API_BASE_URL}{path}", timeout=10)
         response.raise_for_status()
         return response.json()
     except requests.RequestException as exc:
-        st.error(f"Gagal menghubungi API: {exc}")
+        if show_error:
+            st.error(f"Gagal menghubungi API: {exc}")
         return None
+
+
+def render_team_logo_inline(width_px: int = 72) -> None:
+    if not TEAM_LOGO_BASE64.strip():
+        return
+    logo_b64 = "".join(TEAM_LOGO_BASE64.split())
+    st.markdown(
+        f"""
+        <img
+            src="data:{TEAM_LOGO_MIME};base64,{logo_b64}"
+            style="width: {width_px}px; max-width: 100%; border-radius: 12px;"
+        />
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def render_team_logo() -> None:
@@ -288,6 +234,89 @@ def render_team_logo() -> None:
         """,
         unsafe_allow_html=True,
     )
+
+
+header_col, team_logo_col, logo_col = st.columns([0.68, 0.16, 0.16], vertical_alignment="center")
+with header_col:
+        st.markdown(
+                f"""
+                <div class="app-header">
+                        <div class="app-title">{APP_TITLE}</div>
+                        <div class="app-subtitle">{APP_TAGLINE}</div>
+                        <div class="badge-row">
+                                <span class="badge">AI Diagnosis</span>
+                                <span class="badge">Active Learning</span>
+                                <span class="badge">Monitoring & Feedback</span>
+                        </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+        )
+        with team_logo_col:
+            st.markdown("<div class=\"logo-box\">", unsafe_allow_html=True)
+            render_team_logo_inline(width_px=74)
+            st.markdown("</div>", unsafe_allow_html=True)
+with logo_col:
+        st.markdown("<div class=\"logo-box\">", unsafe_allow_html=True)
+        st.image(LOGO_URL, width=90)
+        st.markdown("<div class=\"logo-caption\">Institut Teknologi Sumatera</div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        st.markdown("<div style=\"height:16px\"></div>", unsafe_allow_html=True)
+
+        summary = api_get("/monitoring/summary", show_error=False)
+        if summary:
+            total_predictions = summary.get("total_predictions", 0)
+            avg_confidence = summary.get("average_confidence", 0.0)
+            pending_al = summary.get("active_learning_pending_count", 0)
+
+            cards = st.columns(3)
+            with cards[0]:
+                st.markdown(
+                    f"""
+                    <div class="info-card">
+                        <div class="card-title">Total Predictions</div>
+                        <div class="card-body"><strong>{total_predictions}</strong> prediksi tercatat.</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+            with cards[1]:
+                st.markdown(
+                    f"""
+                    <div class="info-card">
+                        <div class="card-title">Avg Confidence</div>
+                        <div class="card-body"><strong>{avg_confidence:.2%}</strong> rata-rata confidence.</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+            with cards[2]:
+                st.markdown(
+                    f"""
+                    <div class="info-card">
+                        <div class="card-title">Pending Active Learning</div>
+                        <div class="card-body"><strong>{pending_al}</strong> item menunggu validasi.</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+st.markdown("<div class=\"section-divider\"></div>", unsafe_allow_html=True)
+
+page = st.sidebar.radio(
+    "Menu",
+    [
+        "Diagnosis Tanaman",
+        "Dashboard Monitoring",
+        "Active Learning Queue",
+        "Model Registry",
+        "Tentang",
+    ],
+)
+
+with st.sidebar:
+    st.caption("Gunakan menu di atas untuk berpindah fitur utama.")
 
 
 if page == "Diagnosis Tanaman":
@@ -491,32 +520,23 @@ elif page == "Model Registry":
     else:
         st.warning("Model metadata belum ditemukan. Jalankan training di Kaggle dan extract artifact ke folder models/.")
 
-elif page == "Profil Tim":
-    st.header("Profil Tim")
+elif page == "Tentang":
+    st.header("Tentang")
     st.markdown(
-        "<p class=\"section-lead\">Perkenalan singkat tim dan identitas untuk presentasi finalis.</p>",
+        "<p class=\"section-lead\">Ringkasan tujuan, fitur, dan capaian utama AgriMLOps PlantWild.</p>",
         unsafe_allow_html=True,
     )
 
-    team_cols = st.columns([0.55, 0.45])
-    with team_cols[0]:
-        st.markdown(
-            f"""
-            <div class="info-card">
-                <div class="card-title">Nama Tim</div>
-                <div class="card-body"><strong>{TEAM_NAME}</strong></div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        st.markdown("<div style=\"height:12px\"></div>", unsafe_allow_html=True)
+    about_cols = st.columns([0.6, 0.4])
+    with about_cols[0]:
         st.markdown(
             """
             <div class="info-card">
-                <div class="card-title">Anggota</div>
+                <div class="card-title">Ringkasan Proyek</div>
                 <div class="card-body">
-                    1. Gymnastiar Al Khoarizmy (NIM 122450096)<br/>
-                    2. Feryadi Yulius (NIM 122450087)
+                    AgriMLOps PlantWild adalah aplikasi web untuk diagnosis penyakit tanaman berbasis foto.
+                    Sistem ini menghubungkan inferensi, pengumpulan feedback, monitoring, dan model registry
+                    agar siklus perbaikan model lebih terarah.
                 </div>
             </div>
             """,
@@ -526,8 +546,30 @@ elif page == "Profil Tim":
         st.markdown(
             """
             <div class="info-card">
-                <div class="card-title">Institusi</div>
-                <div class="card-body">Institut Teknologi Sumatera</div>
+                <div class="card-title">Fitur Utama</div>
+                <div class="card-body">
+                    <ul>
+                        <li>Diagnosis cepat dari foto dengan confidence dan top-3.</li>
+                        <li>Feedback user dan active learning queue untuk validasi.</li>
+                        <li>Monitoring distribusi prediksi dan performa model.</li>
+                        <li>Model registry untuk melacak artefak training.</li>
+                    </ul>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with about_cols[1]:
+        st.markdown(
+            """
+            <div class="info-card">
+                <div class="card-title">Model Terkini (v3)</div>
+                <div class="card-body">
+                    Accuracy: <strong>0.8288</strong><br/>
+                    Macro F1: <strong>0.8127</strong><br/>
+                    Best Val Macro F1: <strong>0.8254</strong><br/>
+                    Validated feedback: <strong>9</strong> sampel
+                </div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -536,23 +578,15 @@ elif page == "Profil Tim":
         st.markdown(
             """
             <div class="info-card">
-                <div class="card-title">Kontak</div>
-                <div class="card-body">gymnastiar.122450096@student.itera.ac.id</div>
+                <div class="card-title">Catatan Implementasi</div>
+                <div class="card-body">
+                    Feedback berasal dari controlled validated feedback simulation (bukan petani asli).
+                    Retraining masih semi-manual menggunakan Kaggle GPU.
+                </div>
             </div>
             """,
             unsafe_allow_html=True,
         )
-    with team_cols[1]:
-        st.markdown(
-            """
-            <div class="info-card">
-                <div class="card-title">Logo Tim</div>
-                <div class="card-body">Identitas visual untuk presentasi finalis.</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        render_team_logo()
 else:
     st.warning("Halaman tidak ditemukan.")
 
