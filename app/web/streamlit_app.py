@@ -262,46 +262,6 @@ with logo_col:
         st.markdown("<div class=\"logo-caption\">Institut Teknologi Sumatera</div>", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown("<div style=\"height:16px\"></div>", unsafe_allow_html=True)
-
-        summary = api_get("/monitoring/summary", show_error=False)
-        if summary:
-            total_predictions = summary.get("total_predictions", 0)
-            avg_confidence = summary.get("average_confidence", 0.0)
-            pending_al = summary.get("active_learning_pending_count", 0)
-
-            cards = st.columns(3)
-            with cards[0]:
-                st.markdown(
-                    f"""
-                    <div class="info-card">
-                        <div class="card-title">Total Predictions</div>
-                        <div class="card-body"><strong>{total_predictions}</strong> prediksi tercatat.</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-            with cards[1]:
-                st.markdown(
-                    f"""
-                    <div class="info-card">
-                        <div class="card-title">Avg Confidence</div>
-                        <div class="card-body"><strong>{avg_confidence:.2%}</strong> rata-rata confidence.</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-            with cards[2]:
-                st.markdown(
-                    f"""
-                    <div class="info-card">
-                        <div class="card-title">Pending Active Learning</div>
-                        <div class="card-body"><strong>{pending_al}</strong> item menunggu validasi.</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-
 st.markdown("<div class=\"section-divider\"></div>", unsafe_allow_html=True)
 
 page = st.sidebar.radio(
