@@ -28,9 +28,9 @@ from torchvision import transforms
 from tqdm.auto import tqdm
 
 # ==================== CONFIGURATION ====================
-# v2 validates that the MLOps retraining pipeline works correctly.
-# Fine-tuned from v1_revised with the same dataset — no new data added.
-# Purpose: demonstrate pipeline integrity, not maximize accuracy.
+# v2: fine-tune from v1_revised with simulated feedback targeting worst classes.
+# 50 misclassified samples from test set (apple scab, plum leaf, tomato late blight)
+# are added to training set — simulating expert-validated active learning feedback.
 IS_KAGGLE = Path("/kaggle/input").exists()
 SEED = 42
 TOP_K_CLASSES = 15
@@ -40,6 +40,9 @@ FINETUNE_LR = 1e-4
 MAX_EPOCHS = 30
 EARLY_STOP_PATIENCE = 5
 EARLY_STOP_MIN_DELTA = 1e-4
+N_FEEDBACK_SAMPLES = 50
+# Worst classes from v1_revised — targets for simulated feedback
+WORST_CLASSES = ["apple scab", "plum leaf", "tomato late blight"]
 MODEL_NAME = "tf_efficientnetv2_b0"
 MODEL_VERSION = "v2"
 BASE_MODEL_VERSION = "v1_revised"
@@ -75,6 +78,7 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Device: {DEVICE}")
 print(f"Model version: {MODEL_VERSION} (fine-tune from {BASE_MODEL_VERSION})")
 print(f"Environment: {'Kaggle' if IS_KAGGLE else 'Local'}")
+print(f"Worst classes targeted for feedback: {WORST_CLASSES}")
 
 MODEL_DIR.mkdir(parents=True, exist_ok=True)
 REPORT_DIR.mkdir(parents=True, exist_ok=True)
@@ -187,12 +191,12 @@ for row in tqdm(subset.to_dict("records"), desc="Validating images"):
 subset = pd.DataFrame(valid_rows)
 subset["label_id"] = subset["label"].map(label_to_id)
 
+# Use same split as v1_revised — identical SEED ensures same train/val/test sets
 train_df, temp_df = train_test_split(subset, test_size=0.30, random_state=SEED, stratify=subset["label_id"])
 val_df, test_df = train_test_split(temp_df, test_size=0.50, random_state=SEED, stratify=temp_df["label_id"])
 train_df = train_df.copy()
 val_df = val_df.copy()
 test_df = test_df.copy()
-
 print(f"Train: {len(train_df)}, Val: {len(val_df)}, Test: {len(test_df)}")
 
 train_df["split"] = "train"
@@ -307,11 +311,61 @@ def evaluate_model(loader):
         "y_pred": all_preds,
     }
 
-# ==================== DATALOADERS ====================
-# v2 uses the same dataset as v1_revised — no new data added.
-# Purpose: validate that the MLOps retraining pipeline works without regression.
-print(f"Train: {len(train_df)}, Val: {len(val_df)}, Test: {len(test_df)}")
-print("No additional samples added — pipeline validation run.")
+# ==================== SIMULATED FEEDBACK ====================
+# Simulate validated feedback: prioritize misclassified samples from worst classes,
+# then fill up with any samples from those classes to reach N_FEEDBACK_SAMPLES total.
+# Test set is NOT modified — it stays fixed for fair evaluation.
+print("Generating simulated feedback from worst-performing classes ...")
+print(f"Target classes: {WORST_CLASSES}")
+
+# Run inference on test_df to find misclassified samples
+model.eval()
+test_preds = []
+with torch.no_grad():
+    for i in tqdm(range(len(test_df)), desc="Scoring test set for feedback"):
+        row = test_df.iloc[i]
+        try:
+            img = Image.open(row["image_path"]).convert("RGB")
+            tensor = eval_transform(img).unsqueeze(0).to(DEVICE)
+            pred_id = int(torch.argmax(model(tensor), dim=1)[0].cpu())
+            test_preds.append(pred_id)
+        except Exception:
+            test_preds.append(-1)
+
+test_df_scored = test_df.copy()
+test_df_scored["pred_id"] = test_preds
+test_df_scored["correct"] = test_df_scored["label_id"] == test_df_scored["pred_id"]
+
+# Only consider samples from worst classes
+worst_test = test_df_scored[test_df_scored["label"].isin(WORST_CLASSES)].copy()
+misclassified = worst_test[~worst_test["correct"]].copy()
+misclassified["source"] = "simulated_feedback_misclassified"
+
+print(f"Misclassified samples from worst classes: {len(misclassified)}")
+
+# Fill to N_FEEDBACK_SAMPLES using correctly classified from worst classes if needed
+remaining_needed = N_FEEDBACK_SAMPLES - len(misclassified)
+feedback_samples_list = [misclassified]
+
+if remaining_needed > 0:
+    correctly_classified = worst_test[worst_test["correct"]].copy()
+    fill_samples = correctly_classified.sample(
+        n=min(remaining_needed, len(correctly_classified)), random_state=SEED
+    ).copy()
+    fill_samples["source"] = "simulated_feedback_correct"
+    feedback_samples_list.append(fill_samples)
+    print(f"Added {len(fill_samples)} correctly-classified samples from worst classes to reach target")
+
+feedback_samples = pd.concat(feedback_samples_list, ignore_index=True)
+feedback_save = feedback_samples[["image_path", "label", "label_id", "source", "correct"]].copy()
+feedback_save.to_csv(REPORT_DIR / "simulated_feedback_v2.csv", index=False)
+print(f"Total simulated feedback samples: {len(feedback_samples)}")
+
+# Add feedback samples to train_df (test_df unchanged)
+fb_train = feedback_samples[["image_path", "label", "label_id"]].copy()
+fb_train["split"] = "train"
+train_df = pd.concat([train_df, fb_train], ignore_index=True)
+print(f"Train set after adding feedback samples: {len(train_df)}")
 
 train_loader = DataLoader(PlantWildDataset(train_df, train_transform), batch_size=BATCH_SIZE, shuffle=True, num_workers=2, pin_memory=True)
 val_loader = DataLoader(PlantWildDataset(val_df, eval_transform), batch_size=BATCH_SIZE, shuffle=False, num_workers=2, pin_memory=True)
@@ -377,10 +431,10 @@ report_dict = classification_report(
 )
 per_class_f1 = {label: report_dict[label]["f1-score"] for label in labels}
 sorted_f1 = sorted(per_class_f1.items(), key=lambda x: x[1])
-worst_classes = [{"class_name": k, "f1": round(v, 4)} for k, v in sorted_f1[:3]]
-best_classes = [{"class_name": k, "f1": round(v, 4)} for k, v in sorted_f1[-3:]]
-print("Worst 3 classes:", worst_classes)
-print("Best 3 classes:", best_classes)
+worst_classes_result = [{"class_name": k, "f1": round(v, 4)} for k, v in sorted_f1[:3]]
+best_classes_result = [{"class_name": k, "f1": round(v, 4)} for k, v in sorted_f1[-3:]]
+print("Worst 3 classes:", worst_classes_result)
+print("Best 3 classes:", best_classes_result)
 
 plt.figure(figsize=(10, 8))
 class_names_sorted = [x[0] for x in sorted_f1]
@@ -448,9 +502,10 @@ metrics = {
     "final_lr": float(optimizer.param_groups[0]["lr"]),
     "inference_time_ms_mean": inf_mean,
     "inference_time_ms_std": inf_std,
-    "worst_classes": worst_classes,
-    "best_classes": best_classes,
-    "feedback_samples_added": 0,
+    "worst_classes": worst_classes_result,
+    "best_classes": best_classes_result,
+    "feedback_samples_added": len(feedback_samples),
+    "feedback_target_classes": WORST_CLASSES,
 }
 with open(REPORT_DIR / f"metrics_{MODEL_VERSION}.json", "w", encoding="utf-8") as f:
     json.dump(metrics, f, indent=2)
@@ -482,7 +537,8 @@ plt.close()
 dataset_summary = {
     "model_version": MODEL_VERSION,
     "plantwild_samples": int(len(subset)),
-    "feedback_samples_used": 0,
+    "feedback_samples_used": int(len(feedback_samples)),
+    "feedback_target_classes": WORST_CLASSES,
     "train_samples": int(len(train_df)),
     "val_samples": int(len(val_df)),
     "test_samples": int(len(test_df)),
@@ -496,7 +552,7 @@ metadata = {
     "model_version": MODEL_VERSION,
     "model_name": MODEL_NAME,
     "base_model_version": BASE_MODEL_VERSION,
-    "dataset": "uqtwei2/PlantWild subset",
+    "dataset": "uqtwei2/PlantWild subset + simulated feedback",
     "dataset_version": "PlantWild v1",
     "num_classes": len(labels),
     "input_size": INPUT_SIZE,
@@ -508,7 +564,8 @@ metadata = {
     "scheduler": "CosineAnnealingWarmRestarts(T_0=10, T_mult=2)",
     "split_ratio": "70/15/15",
     "seed": SEED,
-    "feedback_samples_used": 0,
+    "feedback_samples_added": len(feedback_samples),
+    "feedback_target_classes": WORST_CLASSES,
     "train_samples": int(len(train_df)),
     "val_samples": int(len(val_df)),
     "test_samples": int(len(test_df)),
@@ -522,7 +579,7 @@ metadata = {
     "framework": "PyTorch + timm",
     "pretrained_source": "v1_revised",
     "created_at": datetime.now(timezone.utc).isoformat(),
-    "notes": f"fine-tuned from {BASE_MODEL_VERSION} — MLOps retraining pipeline validation, same dataset as v1_revised",
+    "notes": f"fine-tuned from {BASE_MODEL_VERSION} with {len(feedback_samples)} simulated feedback samples targeting worst classes",
 }
 with open(MODEL_DIR / f"model_{MODEL_VERSION}_metadata.json", "w", encoding="utf-8") as f:
     json.dump(metadata, f, indent=2)
