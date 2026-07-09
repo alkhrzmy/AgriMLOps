@@ -312,56 +312,61 @@ def evaluate_model(loader):
     }
 
 # ==================== SIMULATED FEEDBACK ====================
-# Simulate validated feedback: prioritize misclassified samples from worst classes,
-# then fill up with any samples from those classes to reach N_FEEDBACK_SAMPLES total.
-# Test set is NOT modified — it stays fixed for fair evaluation.
+# Simulate MLOps active learning: v1_revised running in production on unseen data (val_df).
+# Expert identifies misclassified samples from worst-performing classes,
+# validates correct labels, then adds them as feedback for retraining.
+# Source: val_df (unseen data, simulates production) — test_df remains fully sterile.
 print("Generating simulated feedback from worst-performing classes ...")
 print(f"Target classes: {WORST_CLASSES}")
 
-# Run inference on test_df to find misclassified samples
+# Run inference on val_df to find misclassified samples
 model.eval()
-test_preds = []
+val_preds = []
 with torch.no_grad():
-    for i in tqdm(range(len(test_df)), desc="Scoring test set for feedback"):
-        row = test_df.iloc[i]
+    for i in tqdm(range(len(val_df)), desc="Scoring val set for feedback"):
+        row = val_df.iloc[i]
         try:
             img = Image.open(row["image_path"]).convert("RGB")
             tensor = eval_transform(img).unsqueeze(0).to(DEVICE)
             pred_id = int(torch.argmax(model(tensor), dim=1)[0].cpu())
-            test_preds.append(pred_id)
+            val_preds.append(pred_id)
         except Exception:
-            test_preds.append(-1)
+            val_preds.append(-1)
 
-test_df_scored = test_df.copy()
-test_df_scored["pred_id"] = test_preds
-test_df_scored["correct"] = test_df_scored["label_id"] == test_df_scored["pred_id"]
+val_df_scored = val_df.copy()
+val_df_scored["pred_id"] = val_preds
+val_df_scored["correct"] = val_df_scored["label_id"] == val_df_scored["pred_id"]
 
-# Only consider samples from worst classes
-worst_test = test_df_scored[test_df_scored["label"].isin(WORST_CLASSES)].copy()
-misclassified = worst_test[~worst_test["correct"]].copy()
+# Only consider samples from worst classes in validation set
+worst_val = val_df_scored[val_df_scored["label"].isin(WORST_CLASSES)].copy()
+misclassified = worst_val[~worst_val["correct"]].copy()
 misclassified["source"] = "simulated_feedback_misclassified"
 
-print(f"Misclassified samples from worst classes: {len(misclassified)}")
+print(f"Misclassified val samples from worst classes: {len(misclassified)}")
 
-# Fill to N_FEEDBACK_SAMPLES using correctly classified from worst classes if needed
+# Fill to N_FEEDBACK_SAMPLES using correctly classified if needed
 remaining_needed = N_FEEDBACK_SAMPLES - len(misclassified)
 feedback_samples_list = [misclassified]
 
 if remaining_needed > 0:
-    correctly_classified = worst_test[worst_test["correct"]].copy()
+    correctly_classified = worst_val[worst_val["correct"]].copy()
     fill_samples = correctly_classified.sample(
         n=min(remaining_needed, len(correctly_classified)), random_state=SEED
     ).copy()
     fill_samples["source"] = "simulated_feedback_correct"
     feedback_samples_list.append(fill_samples)
-    print(f"Added {len(fill_samples)} correctly-classified samples from worst classes to reach target")
+    print(f"Added {len(fill_samples)} correctly-classified val samples from worst classes to reach target")
 
 feedback_samples = pd.concat(feedback_samples_list, ignore_index=True)
 feedback_save = feedback_samples[["image_path", "label", "label_id", "source", "correct"]].copy()
 feedback_save.to_csv(REPORT_DIR / "simulated_feedback_v2.csv", index=False)
 print(f"Total simulated feedback samples: {len(feedback_samples)}")
 
-# Add feedback samples to train_df (test_df unchanged)
+# Remove feedback samples from val_df to keep val set clean for evaluation
+val_df = val_df[~val_df["image_path"].isin(feedback_samples["image_path"])].copy().reset_index(drop=True)
+print(f"Val set after removing feedback samples: {len(val_df)}")
+
+# Add feedback samples to train_df
 fb_train = feedback_samples[["image_path", "label", "label_id"]].copy()
 fb_train["split"] = "train"
 train_df = pd.concat([train_df, fb_train], ignore_index=True)
