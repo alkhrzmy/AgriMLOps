@@ -281,8 +281,17 @@ model.load_state_dict(torch.load(BASE_MODEL_PATH, map_location=DEVICE))
 model = model.to(DEVICE)
 print(f"Loaded base model from {BASE_MODEL_PATH}")
 
+# Freeze backbone — only train classifier head to prevent catastrophic forgetting
+for param in model.parameters():
+    param.requires_grad = False
+for param in model.classifier.parameters():
+    param.requires_grad = True
+trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+total_params = sum(p.numel() for p in model.parameters())
+print(f"Frozen backbone: {total_params - trainable_params:,}/{total_params:,} params (only classifier head trainable)")
+
 criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
-optimizer = torch.optim.AdamW(model.parameters(), lr=FINETUNE_LR, weight_decay=1e-4)
+optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()), lr=5e-4, weight_decay=1e-4)
 scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=2)
 scaler = torch.cuda.amp.GradScaler(enabled=torch.cuda.is_available())
 
